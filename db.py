@@ -5,7 +5,11 @@ from psycopg2.extras import RealDictCursor
 DB_URL = os.getenv("DATABASE_URL")
 
 def init_db():
-    conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        sslmode="require",
+        cursor_factory=RealDictCursor
+    )
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS games (
@@ -22,7 +26,10 @@ def init_db():
     conn.close()
 
 def save_game_to_db(room_name, players, roles, winner):
-    conn = psycopg2.connect(DB_URL)
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        sslmode="require"
+    )
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO games (room_name, players, roles, winner) VALUES (%s, %s, %s, %s)",
