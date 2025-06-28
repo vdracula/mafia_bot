@@ -473,8 +473,17 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     print(f"[DEBUG] Получен callback: {data}")
 
-    if data == "menu_play" or data.startswith("room_info_") or data in ["menu_help", "menu_rooms", "auto_join_prompt", "menu_back"]:
-        await main_menu_handler(update, context)
+     if data == "menu_play":
+        from main import create_play_menu
+        await create_play_menu(query)
+    elif data.startswith("room_info_"):
+        await show_room_info(update, context, data)
+    elif data == "menu_help":
+        await show_help_menu(update, context)
+    elif data == "auto_join_prompt":
+        await auto_join_game(update, context)
+    elif data == "menu_back":
+        await back_to_main_menu(update, context)
     elif data.startswith("select_join_"):
         await select_room_handler(update, context)
     elif data.startswith("edit_"):
