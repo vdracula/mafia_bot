@@ -4,7 +4,11 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 # === Импорт базы данных ===
-from db import init_db, save_game_to_db
+from db import init_db
+
+if __name__ == '__main__':
+    init_db()  # ← Эта строка должна быть
+    app.run_polling()
 
 # === Хранение комнат ===
 rooms = {}
