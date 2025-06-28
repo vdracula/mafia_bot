@@ -130,7 +130,20 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Главное меню:", reply_markup=reply_markup)
-
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = """
+    ❓ Список команд:
+    
+/start - Запустить бота
+/help - Показать список команд
+/create_room [название] - Создать комнату
+/join_room [название] - Присоединиться к комнате
+/start_game - Начать игру
+/set_roles - Настроить роли
+/find_game - Автоприсоединение
+/admin - Админ-панель
+"""
+    await update.message.reply_text(text)
 # === Команды ===
 async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(update, Update):
