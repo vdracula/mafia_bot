@@ -474,16 +474,16 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"[DEBUG] Получен callback: {data}")
 
     if data == "menu_play":
-        from main import create_play_menu
-        await create_play_menu(query)
+        await main_menu_handler(update, context)
     elif data.startswith("room_info_"):
-        await show_room_info(update, context, data)
+        await main_menu_handler(update, context)
     elif data == "menu_help":
-        await show_help_menu(update, context)
+        await main_menu_handler(update, context)
     elif data == "auto_join_prompt":
-        await auto_join_game(update, context)
+        await find_game(query, context)
+        await query.edit_message_text("Вы автоматически присоединились к комнате.")
     elif data == "menu_back":
-        await back_to_main_menu(update, context)
+        await main_menu_handler(update, context)
     elif data.startswith("select_join_"):
         await select_room_handler(update, context)
     elif data.startswith("edit_"):
@@ -500,6 +500,8 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_button_handler(update, context)
     elif data == "menu_back_admin":
         await admin_panel(update, context)
+    else:
+        await query.edit_message_text("Неизвестное действие.")
 
 
 # === Запуск бота ===
