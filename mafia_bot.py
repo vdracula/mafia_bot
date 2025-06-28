@@ -473,7 +473,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     print(f"[DEBUG] Получен callback: {data}")
 
-     if data == "menu_play":
+    if data == "menu_play":
         from main import create_play_menu
         await create_play_menu(query)
     elif data.startswith("room_info_"):
