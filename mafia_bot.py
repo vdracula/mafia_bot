@@ -12,11 +12,12 @@ rooms = {}
 
 # === Роли и изображения ===
 ROLE_IMAGES = {
-    "Мафия": "https://i.imgur.com/Qlntb6R.jpg",  
-    "Доктор": "https://i.imgur.com/LfZxJQg.jpg",  
-    "Комиссар": "https://i.imgur.com/RjVBYGq.jpg",  
-    "Мирный житель": "https://i.imgur.com/WvK7Y9m.jpg"  
+    "Мафия": "https://i.imgur.com/Qlntb6R.jpg", 
+    "Доктор": "https://i.imgur.com/LfZxJQg.jpg", 
+    "Комиссар": "https://i.imgur.com/RjVBYGq.jpg", 
+    "Мирный житель": "https://i.imgur.com/WvK7Y9m.jpg" 
 }
+
 DEFAULT_ROLE_COUNTS = {
     "Мафия": 1,
     "Доктор": 1,
@@ -32,6 +33,7 @@ async def get_user_name(context, user_id):
     except:
         return "Неизвестный"
 
+
 def assign_roles(room):
     role_list = []
     for role, count in room["roles"].items():
@@ -42,12 +44,14 @@ def assign_roles(room):
         role_list.append("Мирный житель")
     room["assigned_roles"] = dict(zip(players, role_list))
 
+
 async def send_private_role(context, user_id, role):
     try:
         await context.bot.send_photo(chat_id=user_id, photo=ROLE_IMAGES[role], caption=f"Ваша роль: {role}")
     except Exception as e:
         print(f"Ошибка отправки фото пользователю {user_id}: {e}")
         await context.bot.send_message(chat_id=user_id, text=f"Ваша роль: {role}")
+
 
 # === Команды бота ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -59,13 +63,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Привет! Я бот для игры в Мафию.", reply_markup=reply_markup)
 
+
 # === Главное меню ===
 async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     data = query.data
-
     if data == "menu_play":
         keyboard = [
             [InlineKeyboardButton("🆕 Создать комнату", callback_data="create_room_prompt")],
@@ -76,22 +79,19 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Выберите действие:", reply_markup=reply_markup)
-
     elif data == "menu_help":
         text = """
         ❓ Помощь:
-        
         /create_room - Создать комнату
         /join_room - Присоединиться к комнате
         /rooms - Посмотреть список комнат
         /start_game - Начать игру
-        /set_roles - Установить роли
+        /set_roles - Настроить роли
         /admin - Админ-панель
         """
         keyboard = [[InlineKeyboardButton("⬅️ Назад", callback_data="menu_back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup)
-
     elif data == "menu_rooms":
         if not rooms:
             await query.answer("Нет доступных комнат.")
@@ -102,7 +102,6 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data="menu_back")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Список комнат:", reply_markup=reply_markup)
-
     elif data.startswith("room_info_"):
         room_name = data.replace("room_info_", "")
         if room_name not in rooms:
@@ -110,18 +109,16 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         room = rooms[room_name]
         player_names = "\n".join([await get_user_name(context, pid) for pid in room["players"]])
-        msg = f"📌 Информация о комнате '{room_name}':\n\n"
+        msg = f"📌 Информация о комнате '{room_name}':\n"
         msg += f"Статус: {'🎮 В игре' if room['started'] else '🕒 Ожидает'}\n"
         msg += f"Игроков: {len(room['players'])}/8\n"
         msg += f"Участники:\n{player_names}"
         keyboard = [[InlineKeyboardButton("⬅️ Назад", callback_data="menu_rooms")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(msg, reply_markup=reply_markup)
-
     elif data == "auto_join_prompt":
         await find_game(query, context)
         await query.edit_message_text("Вы автоматически присоединились к комнате.")
-
     elif data == "menu_back":
         keyboard = [
             [InlineKeyboardButton("🎮 Играть", callback_data="menu_play")],
@@ -130,10 +127,11 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Главное меню:", reply_markup=reply_markup)
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = """
     ❓ Список команд:
-    
 /start - Запустить бота
 /help - Показать список команд
 /create_room [название] - Создать комнату
@@ -144,6 +142,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /admin - Админ-панель
 """
     await update.message.reply_text(text)
+
+
 # === Команды ===
 async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(update, Update):
@@ -151,19 +151,19 @@ async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.edit_message_text("Введите название новой комнаты:")
 
+
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
-
     # Создание комнаты
     if context.user_data.get('waiting_for_room_name'):
         room_name = text
         if room_name in rooms:
             await update.message.reply_text("Комната с таким названием уже существует.")
             return
-
         rooms[room_name] = {
             "host": user_id,
+            "chat_id": update.effective_chat.id,  # <-- сохраняем chat_id
             "players": [],
             "roles": DEFAULT_ROLE_COUNTS.copy(),
             "assigned_roles": {},
@@ -171,29 +171,27 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "stage": None,
             "votes": {}
         }
-
         await update.message.reply_text(f"✅ Комната '{room_name}' успешно создана!")
         context.user_data.pop('waiting_for_room_name', None)
-
         rooms[room_name]["players"].append(user_id)
         await update.message.reply_text(f"Вы автоматически присоединились к комнате '{room_name}'.")
         await show_current_roles(update, context, room_name, rooms[room_name])
+
 
 # === Присоединение к комнате через выбор ===
 async def join_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not rooms:
         await update.message.reply_text("Нет доступных комнат.")
         return
-
     keyboard = [[InlineKeyboardButton(room_name, callback_data=f"select_join_{room_name}")] for room_name in rooms]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Выберите комнату, к которой хотите присоединиться:", reply_markup=reply_markup)
+
 
 # === Обработчик выбора комнаты ===
 async def select_room_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     data = query.data
     if data.startswith("select_join_"):
         room_name = data.replace("select_join_", "")
@@ -202,24 +200,23 @@ async def select_room_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             if query.from_user.id in room["players"]:
                 await query.edit_message_text("Вы уже состоите в этой комнате.")
                 return
-
             room["players"].append(query.from_user.id)
             await query.edit_message_text(f"✅ Вы присоединились к комнате '{room_name}'.")
             await show_current_roles(query, context, room_name, room)
+
 
 # === Показ списка комнат ===
 async def list_rooms(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not rooms:
         await update.message.reply_text("Пока нет активных комнат.")
         return
-
-    msg = "🚪 Доступные комнаты:\n\n"
+    msg = "🚪 Доступные комнаты:\n"
     for room_name, room in rooms.items():
         status = "🎮 В игре" if room["started"] else "🕒 Ожидает игроков"
         players_count = len(room["players"])
         msg += f"• {room_name} ({players_count} игроков) — {status}\n"
-
     await update.message.reply_text(msg)
+
 
 # === Прочие команды ===
 async def set_roles_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -238,6 +235,7 @@ async def set_roles_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Выберите роль для изменения:", reply_markup=reply_markup)
             return
     await update.message.reply_text("Вы не являетесь ведущим или игра уже началась.")
+
 
 # === Обработчики ролей (редактирование) ===
 async def edit_role_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -271,6 +269,7 @@ async def edit_role_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[*buttons]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(f"Выберите количество для роли '{role}':", reply_markup=reply_markup)
+
 
 async def update_role_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -306,6 +305,7 @@ async def update_role_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text("Выберите роль для изменения:", reply_markup=reply_markup)
 
+
 async def confirm_roles(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -324,6 +324,7 @@ async def confirm_roles(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"\nОбщее количество игроков: {total_players}"
     await query.edit_message_text(msg)
 
+
 async def show_current_roles(update: Update, context: ContextTypes.DEFAULT_TYPE, room_name=None, room=None):
     if not room_name or not room:
         user_id = update.effective_user.id
@@ -341,6 +342,7 @@ async def show_current_roles(update: Update, context: ContextTypes.DEFAULT_TYPE,
     msg += f"\nОбщее количество игроков: {total}"
     await update.message.reply_text(msg)
 
+
 # === Голосование днём ===
 async def vote_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -351,7 +353,7 @@ async def vote_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         chat_id = query.message.chat_id
         for room_name, room in rooms.items():
-            if chat_id == room_name and room["stage"] == "day":
+            if chat_id == room["chat_id"] and room["stage"] == "day":  # Теперь сравниваем chat_id
                 room["votes"][user_id] = voted_player_id
                 voter_name = await get_user_name(context, user_id)
                 target_name = await get_user_name(context, voted_player_id)
@@ -365,11 +367,13 @@ async def vote_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     room["stage"] = "night"
                     room["votes"] = {}
 
+
 def count_votes(votes):
     result = {}
     for v in votes.values():
         result[v] = result.get(v, 0) + 1
     return result
+
 
 # === Запуск игры ===
 async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -391,6 +395,7 @@ async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     await update.message.reply_text("Вы не являетесь ведущим или игра уже начата.")
 
+
 # === Автоприсоединение к игре ===
 async def find_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -405,6 +410,7 @@ async def find_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_room = f"room_{len(rooms) + 1}"
         rooms[new_room] = {
             "host": user_id,
+            "chat_id": update.effective_chat.id,  # <-- сохраняем chat_id
             "players": [user_id],
             "roles": {"Мафия": 1, "Доктор": 1, "Комиссар": 1, "Мирный житель": 5},
             "assigned_roles": {},
@@ -413,6 +419,7 @@ async def find_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "votes": {}
         }
         await update.message.reply_text(f"✅ Создана новая комната: {new_room}")
+
 
 # === Админ-панель ===
 YOUR_ADMIN_ID = 775424515  # Замени на свой Telegram ID
@@ -431,6 +438,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(text, reply_markup=reply_markup)
+
 
 # === Обработчик кнопок админ-панели ===
 async def admin_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -456,12 +464,20 @@ async def admin_button_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     elif data == "menu_back_admin":
         await admin_panel(update, context)
 
-# === Обработчик кнопок ===
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# === Центральный обработчик кнопок ===
+async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     data = query.data
-    if data.startswith("edit_"):
+    await query.answer()
+
+    print(f"[DEBUG] Получен callback: {data}")
+
+    if data == "menu_play" or data.startswith("room_info_") or data in ["menu_help", "menu_rooms", "auto_join_prompt", "menu_back"]:
+        await main_menu_handler(update, context)
+    elif data.startswith("select_join_"):
+        await select_room_handler(update, context)
+    elif data.startswith("edit_"):
         await edit_role_count(update, context)
     elif data.startswith("set_"):
         await update_role_count(update, context)
@@ -469,13 +485,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await confirm_roles(update, context)
     elif data.startswith("vote_"):
         await vote_handler(update, context)
+    elif data in ["restart_game_admin", "end_game_admin", "view_history"]:
+        await admin_button_handler(update, context)
+    elif data.startswith("restart_room_"):
+        await admin_button_handler(update, context)
+    elif data == "menu_back_admin":
+        await admin_panel(update, context)
+
 
 # === Запуск бота ===
 if __name__ == '__main__':
     init_db()
-    
     app = ApplicationBuilder().token(os.getenv("TELEGRAM_BOT_TOKEN")).build()
-    
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("create_room", create_room))
@@ -485,11 +507,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("set_roles", set_roles_start))
     app.add_handler(CommandHandler("find_game", find_game))
     app.add_handler(CommandHandler("admin", admin_panel))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(CallbackQueryHandler(select_room_handler))
-    app.add_handler(CallbackQueryHandler(main_menu_handler))
-    app.add_handler(CallbackQueryHandler(admin_button_handler))
+
+    app.add_handler(CallbackQueryHandler(handle_callbacks))  # <-- один обработчик
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-    
+
     print("Бот запущен...")
     app.run_polling()
