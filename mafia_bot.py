@@ -7,9 +7,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 # === Импорт базы данных ===
 from db import init_db
 
-if __name__ == '__main__':
-    init_db()  # ← Эта строка должна быть
-    app.run_polling()
 
 # === Хранение комнат ===
 rooms = {}
@@ -378,9 +375,9 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # === Запуск бота ===
 if __name__ == '__main__':
     init_db()
-
+    
     app = ApplicationBuilder().token(os.getenv("TELEGRAM_BOT_TOKEN")).build()
-
+    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("create_room", create_room))
@@ -389,7 +386,6 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("set_roles", set_roles_start))
     app.add_handler(CommandHandler("find_game", find_game))
     app.add_handler(CommandHandler("admin", admin_panel))
-
     app.add_handler(CallbackQueryHandler(button_handler))
 
     print("Бот запущен...")
