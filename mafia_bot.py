@@ -79,6 +79,8 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Выберите действие:", reply_markup=reply_markup)
+    elif data == "create_room_prompt":
+        await create_room_prompt_handler(update, context)
     elif data == "menu_help":
         text = """
         ❓ Помощь:
@@ -127,7 +129,8 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Главное меню:", reply_markup=reply_markup)
-
+    else:
+        await query.edit_message_text("Неизвестное действие.")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = """
@@ -503,7 +506,10 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await query.edit_message_text("Неизвестное действие.")
 
-
+async def create_room_prompt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.edit_message_text("Введите название новой комнаты:")
+    context.user_data['waiting_for_room_name'] = True
 # === Запуск бота ===
 if __name__ == '__main__':
     init_db()
