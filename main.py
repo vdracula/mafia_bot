@@ -1,31 +1,69 @@
-import asyncio
-import logging
-from telegram.ext import Application, CommandHandler
-from dotenv import load_dotenv
-
+# main.py
+from telegram.ext import (
+    Application, CommandHandler, CallbackQueryHandler
+)
 from config import TELEGRAM_BOT_TOKEN
 from db import init_db
-from handlers.start_handler import start, help_command
-from handlers.room_handlers import create_room
-from handlers.game_handlers import start_game
 
-load_dotenv()
+# Импорт обработчиков
+from handlers.menu_handlers import show_main_menu
+from handlers.start_handler import help_command
+from handlers.room_handlers import (
+    create_room_button, list_rooms, join_room_button
+)
+from handlers.game_handlers import (
+    start_game, check_status_button,
+    start_vote, handle_vote, end_vote
+)
+from handlers.role_handlers import (
+    set_roles_start, edit_role_count,
+    update_role_count, confirm_roles
+)
+from handlers.admin_handlers import (
+    shutdown, admin_stats, clean_db,
+    broadcast, show_end_buttons, record_winner
+)
 
+import logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-async def run():
+
+async def main():
     pool = await init_db()
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.bot_data['pool'] = pool
 
-    app.add_handler(CommandHandler("start", start))
+    # Команды
+    app.add_handler(CommandHandler("start", show_main_menu))
     app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("create_room", create_room))
     app.add_handler(CommandHandler("start_game", start_game))
+    app.add_handler(CommandHandler("set_roles", set_roles_start))
+    app.add_handler(CommandHandler("start_vote", start_vote))
+    app.add_handler(CommandHandler("end_game", show_end_buttons))
 
-    logger.info("Бот запущен")
+    # Админ-команды
+    app.add_handler(CommandHandler("shutdown", shutdown))
+    app.add_handler(CommandHandler("admin_stats", admin_stats))
+    app.add_handler(CommandHandler("clean_db", clean_db))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+
+    # Callback-кнопки
+    app.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
+    app.add_handler(CallbackQueryHandler(create_room_button, pattern="^create_room$"))
+    app.add_handler(CallbackQueryHandler(list_rooms, pattern="^join_room$"))
+    app.add_handler(CallbackQueryHandler(join_room_button, pattern="^join_room_"))
+    app.add_handler(CallbackQueryHandler(check_status_button, pattern="^check_status$"))
+    app.add_handler(CallbackQueryHandler(edit_role_count, pattern="^edit_"))
+    app.add_handler(CallbackQueryHandler(update_role_count, pattern="^set_"))
+    app.add_handler(CallbackQueryHandler(confirm_roles, pattern="^confirm_roles$"))
+    app.add_handler(CallbackQueryHandler(handle_vote, pattern="^vote_"))
+    app.add_handler(CallbackQueryHandler(end_vote, pattern="^end_vote_"))
+    app.add_handler(CallbackQueryHandler(record_winner, pattern="^game_end_"))
+
+    # Запуск
     await app.run_polling()
 
+
 if __name__ == '__main__':
-    asyncio.run(run())
+    import asyncio
+    asyncio.run(main())

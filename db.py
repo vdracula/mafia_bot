@@ -36,4 +36,22 @@ async def init_db():
                 PRIMARY KEY (room_id, role)
             );
         ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS votes (
+                room_id INTEGER REFERENCES rooms(id),
+                voter_id BIGINT,
+                target_id BIGINT,
+                PRIMARY KEY (room_id, voter_id)
+            );
+        ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS game_stats (
+                id SERIAL PRIMARY KEY,
+                room_id INTEGER REFERENCES rooms(id),
+                winner TEXT,
+                total_players INTEGER,
+                duration INTERVAL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        ''')
     return pool
