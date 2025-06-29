@@ -49,7 +49,7 @@ async def edit_role_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for delta in [-1, 0, +1]:
         new_count = max(0, current_count + delta)
         buttons.append(
-            InlineKeyboardButton(f"{new_count}", callback_data=f"set_{role_key}_{new_count}")
+            InlineKeyboardButton(str(new_count), callback_data=f"set_{role_key}_{new_count}")
         )
     keyboard = [[*buttons]]
     reply_markup = InlineKeyboardMarkup(keyboard)

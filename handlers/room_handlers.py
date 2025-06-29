@@ -11,7 +11,6 @@ async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.edit_message_text("Введите название новой комнаты:")
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from utils import assign_roles
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
@@ -55,6 +54,7 @@ async def select_room_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     data = query.data
+
     if data.startswith("select_join_"):
         room_name = data.replace("select_join_", "")
         if room_name in rooms:

@@ -1,6 +1,6 @@
 # utils.py
 
-from telegram import ContextTypes
+from telegram.ext import ContextTypes
 
 async def get_user_name(context: ContextTypes.DEFAULT_TYPE, user_id):
     try:

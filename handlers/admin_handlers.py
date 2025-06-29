@@ -1,10 +1,10 @@
 # handlers/admin_handlers.py
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from db import rooms
 
-YOUR_ADMIN_ID = 775424515  # замените на свой Telegram ID
+YOUR_ADMIN_ID = 775424515  # замените на ваш ID
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -17,7 +17,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Завершить игру", callback_data="end_game_admin")],
         [InlineKeyboardButton("Перезапустить игру", callback_data="restart_game_admin")],
-        [InlineKeyboardButton("Посмотреть историю игр", callback_data="view_history")]
+        [InlineKeyboardButton("Посмотреть историю", callback_data="view_history")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(text, reply_markup=reply_markup)
@@ -27,9 +27,7 @@ async def admin_button_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     data = query.data
     if data == "restart_game_admin":
-        keyboard = []
-        for room_name in rooms:
-            keyboard.append([InlineKeyboardButton(room_name, callback_data=f"restart_room_{room_name}")])
+        keyboard = [[InlineKeyboardButton(room_name, callback_data=f"restart_room_{room_name}")] for room_name in rooms]
         keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data="menu_back_admin")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Выберите комнату для перезапуска:", reply_markup=reply_markup)
@@ -43,5 +41,4 @@ async def admin_button_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             room["assigned_roles"] = {}
             await query.edit_message_text(f"🔄 Игра в комнате '{room_name}' перезапущена.")
     elif data == "menu_back_admin":
-        from handlers.admin_handlers import admin_panel
         await admin_panel(update, context)
