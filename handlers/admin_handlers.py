@@ -4,9 +4,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from db import rooms
 
-YOUR_ADMIN_ID = 775424515  # замените на ваш ID
-
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from config import YOUR_ADMIN_ID
     user_id = update.effective_user.id
     if user_id != YOUR_ADMIN_ID:
         await update.message.reply_text("🔒 У вас нет доступа.")
@@ -27,7 +26,7 @@ async def admin_button_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     data = query.data
     if data == "restart_game_admin":
-        keyboard = [[InlineKeyboardButton(room_name, callback_data=f"restart_room_{room_name}")] for room_name in rooms]
+        keyboard = [[InlineKeyboardButton(rn, callback_data=f"restart_room_{rn}") for rn in rooms]]
         keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data="menu_back_admin")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Выберите комнату для перезапуска:", reply_markup=reply_markup)

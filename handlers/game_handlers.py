@@ -3,16 +3,16 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from db import rooms
-from utils import count_votes
+from utils import get_user_name, count_votes, send_private_role
 
 async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
     for room_name, room in rooms.items():
         if user_id == room["host"] and not room["started"]:
             if len(room["players"]) < 4:
                 await update.message.reply_text("Нужно минимум 4 игрока.")
                 return
-            from utils import assign_roles
             assign_roles(room)
             room["started"] = True
             room["stage"] = "night"
@@ -37,7 +37,7 @@ async def vote_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 room["votes"][user_id] = voted_player_id
                 voter_name = await get_user_name(context, user_id)
                 target_name = await get_user_name(context, voted_player_id)
-                await query.edit_message_text(f"{voter_name}, вы проголосовали за {target_name}.")
+                await query.edit_message_text(text=f"{voter_name}, вы проголосовали за {target_name}.")
                 if len(room["votes"]) == len(room["players"]):
                     result = count_votes(room["votes"])
                     kicked = max(result, key=result.get)

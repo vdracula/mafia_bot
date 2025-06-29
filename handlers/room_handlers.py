@@ -3,6 +3,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from db import rooms
+from utils import get_user_name, assign_roles, send_private_role
 
 async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(update, Update):
@@ -20,6 +21,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Комната с таким названием уже существует.")
             return
 
+        from config import YOUR_ADMIN_ID
         rooms[room_name] = {
             "host": user_id,
             "chat_id": update.effective_chat.id,
@@ -65,17 +67,6 @@ async def select_room_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             room["players"].append(query.from_user.id)
             await query.edit_message_text(f"✅ Вы присоединились к комнате '{room_name}'.")
             await show_current_roles(query, context, room_name, room)
-
-async def list_rooms(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not rooms:
-        await update.message.reply_text("Пока нет активных комнат.")
-        return
-    msg = "🚪 Доступные комнаты:\n"
-    for room_name, room in rooms.items():
-        status = "🎮 В игре" if room["started"] else "🕒 Ожидает игроков"
-        players_count = len(room["players"])
-        msg += f"• {room_name} ({players_count} игроков) — {status}\n"
-    await update.message.reply_text(msg)
 
 async def show_current_roles(update: Update, context: ContextTypes.DEFAULT_TYPE, room_name=None, room=None):
     if not room_name or not room:

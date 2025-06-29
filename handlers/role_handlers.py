@@ -3,6 +3,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from db import rooms
+from utils import assign_roles
 
 async def set_roles_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
