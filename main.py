@@ -2,11 +2,10 @@
 
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from handlers.start_handler import start, help_command
-from handlers.room_handlers import create_room, join_room, list_rooms, message_handler, select_room_handler, find_game
+from handlers.room_handlers import create_room, join_room, list_rooms, message_handler, select_room_handler
 from handlers.role_handlers import set_roles_start, edit_role_count, update_role_count, confirm_roles
 from handlers.game_handlers import start_game, vote_handler
 from handlers.admin_handlers import admin_panel, admin_button_handler
-from handlers.callback_handler import handle_callbacks
 
 if __name__ == '__main__':
     from config import TELEGRAM_BOT_TOKEN
@@ -21,15 +20,13 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("rooms", list_rooms))
     app.add_handler(CommandHandler("start_game", start_game))
     app.add_handler(CommandHandler("set_roles", set_roles_start))
-    app.add_handler(CommandHandler("find_game", find_game))
     app.add_handler(CommandHandler("admin", admin_panel))
 
-    # Кнопки
+    # Обработчики кнопок
     app.add_handler(CallbackQueryHandler(handle_callbacks))
 
-    # Обработка текстовых сообщений
-from telegram.ext import MessageHandler, filters
+    # Обработчик текстовых сообщений
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))  # ✅ Так нужно!
 
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     print("Бот запущен...")
     app.run_polling()
