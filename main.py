@@ -1,30 +1,52 @@
 #!/usr/bin/env python3
 import os
 import asyncio
+import logging
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram import Update
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
-from db import init_db, create_pool
-from handlers.start_handler import start, help_command
-from handlers.room_handlers import create_room, join_room, list_rooms, message_handler
-from handlers.role_handlers import set_roles_start
-from handlers.game_handlers import start_game
-from handlers.admin_handlers import admin_panel
-from handlers.callback_handler import handle_callbacks
+from db import init_db
 
-# Загружаем переменные окружения
+# Настройка логов
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Загрузка переменных окружения
 load_dotenv()
 
-async def post_init(app):
-    """Функция инициализации после запуска бота"""
-    print("Бот успешно запущен!")
-    # Инициализируем БД и сохраняем пул соединений
-    pool = await init_db()
-    app.bot_data['pool'] = pool
+async def startup(app):
+    """Инициализация при запуске"""
+    try:
+        # Инициализация БД
+        pool = await init_db()
+        app.bot_data['pool'] = pool
+        logger.info("Бот инициализирован, БД подключена")
+    except Exception as e:
+        logger.error(f"Ошибка инициализации: {e}")
+        raise
 
-async def register_handlers(app):
+async def shutdown(app):
+    """Корректное завершение работы"""
+    try:
+        if 'pool' in app.bot_data:
+            await app.bot_data['pool'].close()
+            logger.info("Соединение с БД закрыто")
+    except Exception as e:
+        logger.error(f"Ошибка при завершении работы: {e}")
+
+def register_handlers(app):
     """Регистрация всех обработчиков"""
+    from handlers.start_handler import start, help_command
+    from handlers.room_handlers import create_room, join_room, list_rooms, message_handler
+    from handlers.role_handlers import set_roles_start
+    from handlers.game_handlers import start_game
+    from handlers.admin_handlers import admin_panel
+    from handlers.callback_handler import handle_callbacks
+
     # Основные команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -41,32 +63,43 @@ async def register_handlers(app):
     # Админка
     app.add_handler(CommandHandler("admin", admin_panel))
     
-    # Обработчики callback'ов и сообщений
+    # Обработчики
     app.add_handler(CallbackQueryHandler(handle_callbacks))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-async def main():
-    """Основная функция запуска бота"""
+async def run_bot():
+    """Основная функция запуска"""
     try:
-        # Создаем приложение
         app = ApplicationBuilder() \
             .token(os.getenv("TELEGRAM_BOT_TOKEN")) \
-            .post_init(post_init) \
+            .post_init(startup) \
+            .post_stop(shutdown) \
             .build()
 
-        # Регистрируем обработчики
-        await register_handlers(app)
-
-        # Запускаем бота
-        print("Запуск бота...")
-        await app.run_polling()
-
+        register_handlers(app)
+        
+        logger.info("Запуск бота...")
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        
+        # Бесконечный цикл до остановки
+        while True:
+            await asyncio.sleep(3600)  # Проверка каждые 60 минут
+            
+    except asyncio.CancelledError:
+        pass
     except Exception as e:
-        print(f"Ошибка при запуске бота: {e}")
+        logger.error(f"Критическая ошибка: {e}")
     finally:
-        # Закрываем соединения с БД при завершении
-        if 'pool' in app.bot_data:
-            await app.bot_data['pool'].close()
+        if 'app' in locals():
+            logger.info("Остановка бота...")
+            await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(run_bot())
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен вручную")
