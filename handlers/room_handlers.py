@@ -6,28 +6,36 @@ from telegram.ext import ContextTypes
 from db import rooms
 from utils import get_user_name, assign_roles, send_private_role
 
-async def find_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pool = context.bot_data['pool']
     user_id = update.effective_user.id
-    found = False
-    for room_name, room in rooms.items():
-        if not room["started"] and len(room["players"]) < 8:
-            room["players"].append(user_id)
-            await update.message.reply_text(f"✅ Вы присоединились к комнате '{room_name}'.")
-            found = True
-            break
-    if not found:
-        new_room = f"room_{len(rooms) + 1}"
-        rooms[new_room] = {
-            "host": user_id,
-            "chat_id": update.effective_chat.id,
-            "players": [user_id],
-            "roles": {"Мафия": 1, "Доктор": 1, "Комиссар": 1, "Мирный житель": 5},
-            "assigned_roles": {},
-            "started": False,
-            "stage": None,
-            "votes": {}
-        }
-        await update.message.reply_text(f"✅ Создана новая комната: {new_room}")
+    chat_id = update.effective_chat.id
+    
+    async with pool.acquire() as conn:
+        # Check if user already has a room
+        existing_room = await conn.fetchrow(
+            'SELECT id FROM rooms WHERE host_id = $1 AND started = FALSE',
+            user_id
+        )
+        
+        if existing_room:
+            await update.message.reply_text("У вас уже есть активная комната.")
+            return
+            
+        # Create new room
+        room_name = f"room_{user_id}_{int(time.time())}"
+        room_id = await conn.fetchval(
+            'INSERT INTO rooms (name, host_id, chat_id) VALUES ($1, $2, $3) RETURNING id',
+            room_name, user_id, chat_id
+        )
+        
+        # Add host as player
+        await conn.execute(
+            'INSERT INTO players (user_id, room_id) VALUES ($1, $2)',
+            user_id, room_id
+        )
+    
+    await update.message.reply_text(f"✅ Комната '{room_name}' создана!")
         
 async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(update, Update):

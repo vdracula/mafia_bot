@@ -1,5 +1,5 @@
 # utils.py
-
+import random  # Добавить в начало файла
 from telegram.ext import ContextTypes
 
 async def get_user_name(context: ContextTypes.DEFAULT_TYPE, user_id):

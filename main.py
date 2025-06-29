@@ -1,18 +1,22 @@
-# main.py
-
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from handlers.start_handler import start, help_command
-from handlers.room_handlers import create_room, join_room, list_rooms, message_handler, select_room_handler
-from handlers.role_handlers import set_roles_start, edit_role_count, update_role_count, confirm_roles
-from handlers.game_handlers import start_game, vote_handler
-from handlers.admin_handlers import admin_panel, admin_button_handler
+from handlers import *
+from db import init_db
+import asyncio
 
-if __name__ == '__main__':
-    from config import TELEGRAM_BOT_TOKEN
+async def main():
+    # Initialize database
+    pool = await init_db()
+    
+    # Build application
+    app = ApplicationBuilder() \
+        .token(TELEGRAM_BOT_TOKEN) \
+        .post_init(lambda _: print("Bot started")) \
+        .build()
 
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    # Store pool in bot data
+    app.bot_data['pool'] = pool
 
-    # Команды
+    # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("create_room", create_room))
@@ -21,12 +25,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("start_game", start_game))
     app.add_handler(CommandHandler("set_roles", set_roles_start))
     app.add_handler(CommandHandler("admin", admin_panel))
-
-    # Обработчики кнопок
     app.add_handler(CallbackQueryHandler(handle_callbacks))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    # Обработчик текстовых сообщений
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))  # ✅ Так нужно!
+    await app.run_polling()
 
-    print("Бот запущен...")
-    app.run_polling()
+if __name__ == '__main__':
+    asyncio.run(main())
