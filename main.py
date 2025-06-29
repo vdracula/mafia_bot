@@ -2,7 +2,7 @@
 
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from handlers.start_handler import start, help_command
-from handlers.room_handlers import create_room, join_room, list_rooms, message_handler, select_room_handler
+from handlers.room_handlers import create_room, join_room, list_rooms, message_handler, select_room_handler, find_game
 from handlers.role_handlers import set_roles_start, edit_role_count, update_role_count, confirm_roles
 from handlers.game_handlers import start_game, vote_handler
 from handlers.admin_handlers import admin_panel, admin_button_handler

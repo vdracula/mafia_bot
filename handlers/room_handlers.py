@@ -6,6 +6,29 @@ from telegram.ext import ContextTypes
 from db import rooms
 from utils import get_user_name, assign_roles, send_private_role
 
+async def find_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    found = False
+    for room_name, room in rooms.items():
+        if not room["started"] and len(room["players"]) < 8:
+            room["players"].append(user_id)
+            await update.message.reply_text(f"✅ Вы присоединились к комнате '{room_name}'.")
+            found = True
+            break
+    if not found:
+        new_room = f"room_{len(rooms) + 1}"
+        rooms[new_room] = {
+            "host": user_id,
+            "chat_id": update.effective_chat.id,
+            "players": [user_id],
+            "roles": {"Мафия": 1, "Доктор": 1, "Комиссар": 1, "Мирный житель": 5},
+            "assigned_roles": {},
+            "started": False,
+            "stage": None,
+            "votes": {}
+        }
+        await update.message.reply_text(f"✅ Создана новая комната: {new_room}")
+        
 async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(update, Update):
         await update.message.reply_text("Введите название новой комнаты:")
