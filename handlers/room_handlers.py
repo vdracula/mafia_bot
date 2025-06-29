@@ -1,5 +1,6 @@
 # handlers/room_handlers.py
 
+__all__ = ["create_room", "join_room", "list_rooms", "message_handler", "select_room_handler"]
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from db import rooms
@@ -84,3 +85,20 @@ async def show_current_roles(update: Update, context: ContextTypes.DEFAULT_TYPE,
     total = sum(room["roles"].values())
     msg += f"\nОбщее количество игроков: {total}"
     await update.message.reply_text(msg)
+
+    # handlers/room_handlers.py
+
+async def list_rooms(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not rooms:
+        await update.message.reply_text("Пока нет активных комнат.")
+        return
+
+    msg = "🚪 Доступные комнаты:\n"
+    for room_name, room in rooms.items():
+        status = "🎮 В игре" if room["started"] else "🕒 Ожидает игроков"
+        players_count = len(room["players"])
+        msg += f"• {room_name} ({players_count} игроков) — {status}\n"
+
+    await update.message.reply_text(msg)
+
+__all__ = ["create_room", "join_room", "list_rooms", "message_handler", "select_room_handler"]
