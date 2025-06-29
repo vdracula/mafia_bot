@@ -1,13 +1,8 @@
 import asyncpg
 from config import DATABASE_URL
-from typing import Dict, Any
-import os
 
 async def create_pool():
-    return await asyncpg.create_pool(os.getenv('DATABASE_URL'))
-
-# Временное хранилище комнат (если нужно для миграции)
-rooms: Dict[str, Any] = {}
+    return await asyncpg.create_pool(DATABASE_URL)
 
 async def init_db():
     pool = await create_pool()
@@ -21,9 +16,8 @@ async def init_db():
                 started BOOLEAN DEFAULT FALSE,
                 stage TEXT,
                 created_at TIMESTAMP DEFAULT NOW()
-            )
+            );
         ''')
-        
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS players (
                 id SERIAL PRIMARY KEY,
@@ -32,6 +26,14 @@ async def init_db():
                 role TEXT,
                 alive BOOLEAN DEFAULT TRUE,
                 UNIQUE(user_id, room_id)
-            )
+            );
+        ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS room_roles (
+                room_id INTEGER REFERENCES rooms(id),
+                role TEXT,
+                count INTEGER,
+                PRIMARY KEY (room_id, role)
+            );
         ''')
     return pool

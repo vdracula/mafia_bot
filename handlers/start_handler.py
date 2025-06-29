@@ -1,5 +1,3 @@
-# handlers/start_handler.py
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -17,11 +15,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ❓ Список команд:
 /start - Запустить бота
 /help - Показать список команд
-/create_room [название] - Создать комнату
-/join_room [название] - Присоединиться к комнате
+/create_room - Создать комнату
 /start_game - Начать игру
-/set_roles - Настроить роли
-/find_game - Автоприсоединение
-/admin - Админ-панель
 """
     await update.message.reply_text(text)

@@ -1,6 +1,6 @@
-# utils.py
-import random  # Добавить в начало файла
+import random
 from telegram.ext import ContextTypes
+from config import DEFAULT_ROLES
 
 async def get_user_name(context: ContextTypes.DEFAULT_TYPE, user_id):
     try:
@@ -9,31 +9,23 @@ async def get_user_name(context: ContextTypes.DEFAULT_TYPE, user_id):
     except:
         return "Неизвестный"
 
-def assign_roles(room):
-    role_list = []
-    for role, count in room["roles"].items():
-        role_list.extend([role] * count)
-    players = room["players"]
-    random.shuffle(role_list)
-    while len(role_list) < len(players):
-        role_list.append("Мирный житель")
-    room["assigned_roles"] = dict(zip(players, role_list))
+async def assign_roles(pool, room_id):
+    async with pool.acquire() as conn:
+        players = await conn.fetch("SELECT user_id FROM players WHERE room_id = $1", room_id)
+        user_ids = [p["user_id"] for p in players]
+
+        roles_rows = await conn.fetch("SELECT role, count FROM room_roles WHERE room_id = $1", room_id)
+        roles = {r["role"]: r["count"] for r in roles_rows} if roles_rows else DEFAULT_ROLES
+
+        role_list = []
+        for role, count in roles.items():
+            role_list.extend([role] * count)
+        while len(role_list) < len(user_ids):
+            role_list.append("Мирный житель")
+        random.shuffle(role_list)
+
+        for user_id, role in zip(user_ids, role_list):
+            await conn.execute("UPDATE players SET role = $1 WHERE user_id = $2 AND room_id = $3", role, user_id, room_id)
 
 async def send_private_role(context: ContextTypes.DEFAULT_TYPE, user_id, role):
-    ROLE_IMAGES = {
-        "Мафия": "https://i.imgur.com/Qlntb6R.jpg ",
-        "Доктор": "https://i.imgur.com/LfZxJQg.jpg ",
-        "Комиссар": "https://i.imgur.com/RjVBYGq.jpg ",
-        "Мирный житель": "https://i.imgur.com/WvK7Y9m.jpg "
-    }
-    try:
-        await context.bot.send_photo(chat_id=user_id, photo=ROLE_IMAGES[role], caption=f"Ваша роль: {role}")
-    except Exception as e:
-        print(f"Ошибка отправки фото пользователю {user_id}: {e}")
-        await context.bot.send_message(chat_id=user_id, text=f"Ваша роль: {role}")
-
-def count_votes(votes):
-    result = {}
-    for v in votes.values():
-        result[v] = result.get(v, 0) + 1
-    return result
+    await context.bot.send_message(chat_id=user_id, text=f"Ваша роль: {role}")
