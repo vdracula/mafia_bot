@@ -1,6 +1,8 @@
 # handlers/callback_handler.py
 
 from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from db import rooms
 from telegram.ext import ContextTypes
 from handlers.start_handler import start
 from handlers.room_handlers import select_room_handler, show_current_roles

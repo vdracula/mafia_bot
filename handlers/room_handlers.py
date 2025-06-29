@@ -1,6 +1,5 @@
 # handlers/room_handlers.py
 
-__all__ = ["create_room", "join_room", "list_rooms", "message_handler", "select_room_handler"]
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from db import rooms

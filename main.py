@@ -1,22 +1,21 @@
+import random
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from handlers import *
-from db import init_db
-import asyncio
+import os
+from dotenv import load_dotenv
 
-async def main():
-    # Initialize database
-    pool = await init_db()
-    
-    # Build application
+load_dotenv()  # Загружаем переменные из .env
+
+async def post_init(app):
+    print("Бот успешно запущен!")
+
+if __name__ == '__main__':
     app = ApplicationBuilder() \
-        .token(TELEGRAM_BOT_TOKEN) \
-        .post_init(lambda _: print("Bot started")) \
+        .token(os.getenv("TELEGRAM_BOT_TOKEN")) \
+        .post_init(post_init) \
         .build()
 
-    # Store pool in bot data
-    app.bot_data['pool'] = pool
-
-    # Handlers
+    # Регистрируем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("create_room", create_room))
@@ -28,7 +27,4 @@ async def main():
     app.add_handler(CallbackQueryHandler(handle_callbacks))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    await app.run_polling()
-
-if __name__ == '__main__':
-    asyncio.run(main())
+    app.run_polling()

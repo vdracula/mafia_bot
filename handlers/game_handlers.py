@@ -6,48 +6,26 @@ from db import rooms
 from utils import get_user_name, count_votes, send_private_role
 
 async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    pool = context.bot_data['pool']
     user_id = update.effective_user.id
-    
-    async with pool.acquire() as conn:
-        # Get room where user is host
-        room = await conn.fetchrow(
-            '''SELECT r.id, r.name, COUNT(p.id) as player_count 
-               FROM rooms r
-               JOIN players p ON r.id = p.room_id
-               WHERE r.host_id = $1 AND r.started = FALSE
-               GROUP BY r.id''',
-            user_id
-        )
-        
-        if not room:
-            await update.message.reply_text("Вы не являетесь ведущим или игра уже начата.")
+    chat_id = update.effective_chat.id
+    for room_name, room in rooms.items():
+        if not rooms:
+            await query.edit_message_text("Нет активных комнат.")
             return
-            
-        if room['player_count'] < MIN_PLAYERS_TO_START:
-            await update.message.reply_text(f"Нужно минимум {MIN_PLAYERS_TO_START} игрока.")
+        if user_id == room["host"] and not room["started"]:
+            if len(room["players"]) < 4:
+                await update.message.reply_text("Нужно минимум 4 игрока.")
+                return
+            assign_roles(room)
+            room["started"] = True
+            room["stage"] = "night"
+            room["votes"] = {}
+            for player_id in room["players"]:
+                role = room["assigned_roles"][player_id]
+                await send_private_role(context, player_id, role)
+            await update.message.reply_text("🎮 Игра началась!\n🌙 Ночь. Все закрывают глаза...")
             return
-            
-        # Assign roles
-        players = await conn.fetch(
-            'SELECT user_id FROM players WHERE room_id = $1',
-            room['id']
-        )
-        
-        roles = assign_roles(room['player_count'])
-        for player, role in zip(players, roles):
-            await conn.execute(
-                'UPDATE players SET role = $1 WHERE user_id = $2 AND room_id = $3',
-                role, player['user_id'], room['id']
-            )
-        
-        # Update room status
-        await conn.execute(
-            'UPDATE rooms SET started = TRUE, stage = "night" WHERE id = $1',
-            room['id']
-        )
-        
-    await update.message.reply_text("🎮 Игра началась!\n🌙 Ночь. Все закрывают глаза...")
+    await update.message.reply_text("Вы не являетесь ведущим или игра уже начата.")
 
 async def vote_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
