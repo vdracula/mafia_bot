@@ -1,10 +1,10 @@
 import asyncpg
 from config import DATABASE_URL
 from typing import Dict, Any
+import os
 
-# Инициализация подключения к БД
 async def create_pool():
-    return await asyncpg.create_pool(DATABASE_URL)
+    return await asyncpg.create_pool(os.getenv('DATABASE_URL'))
 
 # Временное хранилище комнат (если нужно для миграции)
 rooms: Dict[str, Any] = {}
