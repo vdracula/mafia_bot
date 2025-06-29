@@ -2,7 +2,7 @@
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from db import rooms
+from db import create_pool
 from utils import get_user_name, assign_roles, send_private_role
 
 async def create_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
