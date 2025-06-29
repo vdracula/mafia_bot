@@ -6,6 +6,12 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
 from db import init_db, create_pool
+from handlers.start_handler import start, help_command
+from handlers.room_handlers import create_room, join_room, list_rooms, message_handler
+from handlers.role_handlers import set_roles_start
+from handlers.game_handlers import start_game
+from handlers.admin_handlers import admin_panel
+from handlers.callback_handler import handle_callbacks
 
 # Загружаем переменные окружения
 load_dotenv()
