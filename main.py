@@ -1,11 +1,10 @@
-# main.py
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler
 )
 from config import TELEGRAM_BOT_TOKEN
 from db import init_db
 
-# Импорт обработчиков
+# Импорты обработчиков
 from handlers.menu_handlers import show_main_menu
 from handlers.start_handler import help_command
 from handlers.room_handlers import (
@@ -28,7 +27,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 
-async def main():
+async def setup_app():
     pool = await init_db()
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.bot_data['pool'] = pool
@@ -60,10 +59,14 @@ async def main():
     app.add_handler(CallbackQueryHandler(end_vote, pattern="^end_vote_"))
     app.add_handler(CallbackQueryHandler(record_winner, pattern="^game_end_"))
 
-    # Запуск
-    await app.run_polling()
+    return app
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())
+
+    # Создаём приложение
+    app = asyncio.run(setup_app())
+
+    # Запускаем синхронно
+    app.run_polling()
