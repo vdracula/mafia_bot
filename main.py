@@ -28,7 +28,8 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(handle_callbacks))
 
     # Обработка текстовых сообщений
-    app.add_handler(message_handler)
+from telegram.ext import MessageHandler, filters
 
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     print("Бот запущен...")
     app.run_polling()
