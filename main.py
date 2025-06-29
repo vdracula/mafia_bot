@@ -23,18 +23,13 @@ from handlers.admin_handlers import (
     broadcast, show_end_buttons, record_winner
 )
 
-import nest_asyncio
-nest_asyncio.apply()
+import asyncio
 import logging
 logging.basicConfig(level=logging.INFO)
 
-# здесь мы просто создаем Application
-app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-
 async def setup():
-    # Инициализируем БД
     pool = await init_db()
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.bot_data['pool'] = pool
 
     # Команды
@@ -64,8 +59,16 @@ async def setup():
     app.add_handler(CallbackQueryHandler(end_vote, pattern="^end_vote_"))
     app.add_handler(CallbackQueryHandler(record_winner, pattern="^game_end_"))
 
-# Запускаем setup() в существующем loop
-asyncio.get_event_loop().run_until_complete(setup())
+    return app
 
-# Запускаем приложение синхронно
-app.run_polling()
+
+# 🟢 ВАЖНО: никаких asyncio.run()
+if __name__ == "__main__":
+    import nest_asyncio
+    nest_asyncio.apply()
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    app = loop.run_until_complete(setup())
+
+    app.run_polling()
