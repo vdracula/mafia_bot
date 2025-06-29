@@ -1,3 +1,4 @@
+# main.py
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler
 )
@@ -23,11 +24,11 @@ from handlers.admin_handlers import (
     broadcast, show_end_buttons, record_winner
 )
 
+import asyncio
 import logging
 logging.basicConfig(level=logging.INFO)
 
-
-async def setup_app():
+async def main():
     pool = await init_db()
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.bot_data['pool'] = pool
@@ -59,14 +60,8 @@ async def setup_app():
     app.add_handler(CallbackQueryHandler(end_vote, pattern="^end_vote_"))
     app.add_handler(CallbackQueryHandler(record_winner, pattern="^game_end_"))
 
-    return app
-
+    # Вот здесь просто await
+    await app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-
-    # Создаём приложение
-    app = asyncio.run(setup_app())
-
-    # Запускаем синхронно
-    app.run_polling()
+    asyncio.run(main())
