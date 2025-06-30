@@ -1,54 +1,131 @@
-import random
-from telegram.ext import ContextTypes
-from config import DEFAULT_ROLES
+from sqlalchemy import select, update, delete, func
+from sqlalchemy.exc import NoResultFound
+from database import async_session
+from models import Game, Player, Vote
 
-# Получить имя игрока
-async def get_user_name(context: ContextTypes.DEFAULT_TYPE, user_id):
-    try:
-        user = await context.bot.get_chat(user_id)
-        return user.first_name or user.username or "Игрок"
-    except:
-        return "Неизвестный"
 
-# Назначить роли
-async def assign_roles(pool, room_id):
-    async with pool.acquire() as conn:
-        players = await conn.fetch(
-            "SELECT user_id FROM players WHERE room_id = $1", room_id
+# Создать новую игру
+async def create_game(chat_id: int):
+    async with async_session() as session:
+        game = Game(
+            chat_id=chat_id,
+            is_active=True
         )
-        user_ids = [p["user_id"] for p in players]
+        session.add(game)
+        await session.commit()
+        return game
 
-        roles_rows = await conn.fetch(
-            "SELECT role, count FROM room_roles WHERE room_id = $1", room_id
+
+# Завершить игру
+async def finish_game(chat_id: int):
+    async with async_session() as session:
+        await session.execute(
+            update(Game)
+            .where(Game.chat_id == chat_id, Game.is_active == True)
+            .values(is_active=False)
         )
-        roles = {r["role"]: r["count"] for r in roles_rows} if roles_rows else DEFAULT_ROLES
+        await session.commit()
 
-        role_list = []
-        for role, count in roles.items():
-            role_list.extend([role] * count)
-        while len(role_list) < len(user_ids):
-            role_list.append("Мирный житель")
 
-        random.shuffle(role_list)
-
-        for user_id, role in zip(user_ids, role_list):
-            await conn.execute(
-                "UPDATE players SET role = $1 WHERE user_id = $2 AND room_id = $3",
-                role, user_id, room_id
-            )
-
-# Отправить роль игроку
-async def send_private_role(context: ContextTypes.DEFAULT_TYPE, user_id, role):
-    await context.bot.send_message(
-        chat_id=user_id,
-        text=f"Ваша роль: {role}"
-    )
-
-# Получить статус комнаты
-async def get_room_status(pool, room_id):
-    async with pool.acquire() as conn:
-        players = await conn.fetch(
-            "SELECT user_id, role, alive FROM players WHERE room_id = $1",
-            room_id
+# Получить активную игру
+async def get_active_game(chat_id: int):
+    async with async_session() as session:
+        result = await session.execute(
+            select(Game)
+            .where(Game.chat_id == chat_id, Game.is_active == True)
         )
-        return players
+        game = result.scalar_one_or_none()
+        return game
+
+
+# Добавить игрока в игру
+async def add_player(game_id: int, user_id: int, username: str):
+    async with async_session() as session:
+        player = Player(
+            game_id=game_id,
+            user_id=user_id,
+            username=username,
+            is_alive=True
+        )
+        session.add(player)
+        await session.commit()
+        return player
+
+
+# Получить всех игроков игры
+async def get_players(game_id: int):
+    async with async_session() as session:
+        result = await session.execute(
+            select(Player)
+            .where(Player.game_id == game_id)
+        )
+        return result.scalars().all()
+
+
+# Получить живых игроков игры
+async def get_alive_players(game_id: int):
+    async with async_session() as session:
+        result = await session.execute(
+            select(Player)
+            .where(Player.game_id == game_id, Player.is_alive == True)
+        )
+        return result.scalars().all()
+
+
+# Установить роль игрока
+async def set_player_role(player_id: int, role: str):
+    async with async_session() as session:
+        await session.execute(
+            update(Player)
+            .where(Player.id == player_id)
+            .values(role=role)
+        )
+        await session.commit()
+
+
+# Убить игрока
+async def kill_player(player_id: int):
+    async with async_session() as session:
+        await session.execute(
+            update(Player)
+            .where(Player.id == player_id)
+            .values(is_alive=False)
+        )
+        await session.commit()
+
+
+# Сохранить голос
+async def save_vote(voter_id: int, voted_player_id: int):
+    async with async_session() as session:
+        vote = Vote(
+            voter_id=voter_id,
+            voted_player_id=voted_player_id
+        )
+        session.add(vote)
+        await session.commit()
+
+
+# Посчитать результаты голосования
+async def finish_voting():
+    """
+    Возвращает словарь {voted_player_id: count}
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(Vote.voted_player_id, func.count(Vote.id))
+            .group_by(Vote.voted_player_id)
+        )
+        votes = result.all()
+
+        # Очистим таблицу после подсчета
+        await session.execute(delete(Vote))
+        await session.commit()
+
+        return {player_id: count for player_id, count in votes}
+
+
+# Очистить голоса (если нужно вручную сбросить)
+async def clear_votes():
+    async with async_session() as session:
+        await session.execute(delete(Vote))
+        await session.commit()
