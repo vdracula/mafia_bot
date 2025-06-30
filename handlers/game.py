@@ -1,7 +1,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from keyboards import join_game_keyboard, start_game_keyboard, kill_player_keyboard
-from utils import create_game, add_playere, start_game, kill_player
+from utils import create_game, add_player, start_game, kill_player
 
 router = Router()
 
