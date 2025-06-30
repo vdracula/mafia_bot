@@ -1,7 +1,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from keyboards import join_game_keyboard, start_game_keyboard, kill_player_keyboard
-from utils import create_game, add_player_to_game, start_game, kill_player
+from utils import create_game, add_playere, start_game, kill_player
 
 router = Router()
 
@@ -17,7 +17,7 @@ async def create_new_game(message: Message):
 @router.callback_query(F.data.startswith("join_"))
 async def handle_join(query: CallbackQuery):
     game_id = int(query.data.split("_")[1])
-    await add_player_to_game(game_id, query.from_user.id, query.from_user.first_name)
+    await add_player(game_id, query.from_user.id, query.from_user.first_name)
     await query.message.edit_text(
         f"✅ <b>{query.from_user.first_name}</b> присоединился к игре!",
         reply_markup=query.message.reply_markup
