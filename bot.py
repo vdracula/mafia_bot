@@ -7,7 +7,6 @@ from aiogram.client.bot import DefaultBotProperties
 import os
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-DATABASE_URL = os.environ["DATABASE_URL"]
 
 # Создаем бота и диспетчер
 bot = Bot(
@@ -32,11 +31,3 @@ async def main_runner():
 
 if __name__ == "__main__":
     asyncio.run(main_runner())
-
-from aiogram.client.default import DefaultBotProperties
-
-WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
-WEBHOOK_URL = f"https://{YOUR_DOMAIN_OR_RAILWAY_URL}{WEBHOOK_PATH}"
-
-# При запуске:
-await bot.set_webhook(WEBHOOK_URL)
