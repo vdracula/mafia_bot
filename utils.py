@@ -129,3 +129,24 @@ async def clear_votes():
     async with async_session() as session:
         await session.execute(delete(Vote))
         await session.commit()
+
+# Запустить игру и раздать роли
+async def start_game(game_id: int):
+    async with async_session() as session:
+        # Получим всех игроков
+        result = await session.execute(
+            select(Player)
+            .where(Player.game_id == game_id)
+        )
+        players = result.scalars().all()
+
+        # Сначала всем граждан
+        for p in players:
+            p.role = "citizen"
+
+        # Первому - мафию (для примера)
+        if players:
+            players[0].role = "mafia"
+
+        await session.commit()
+        return players
