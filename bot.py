@@ -1,33 +1,36 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.client.bot import DefaultBotProperties
 import os
+from aiogram import Bot, Dispatcher
+from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from models import Base
+from database import DATABASE_URL
+from handlers import main, game, voting
+
+load_dotenv()
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
-# Создаем бота и диспетчер
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-)
-dp = Dispatcher(storage=MemoryStorage())
+# Создаём бот и диспетчер
+bot = Bot(token=BOT_TOKEN, default=None)
+dp = Dispatcher()
 
-# Импорт роутеров
-from handlers import main, game, voting
+# Функция автоматического создания таблиц
+async def create_tables():
+    engine = create_async_engine(DATABASE_URL, echo=True)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await engine.dispose()
 
 # Регистрируем роутеры
 dp.include_router(main.router)
 dp.include_router(game.router)
 dp.include_router(voting.router)
 
-
-async def main_runner():
-    logging.basicConfig(level=logging.INFO)
-    await dp.start_polling(bot)
-
-
+# Запуск
 if __name__ == "__main__":
-    asyncio.run(main_runner())
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(create_tables())  # Сначала создаём таблицы
+    dp.run_polling(bot)           # Потом запускаем бота
