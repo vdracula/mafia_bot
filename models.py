@@ -3,11 +3,11 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
-
 class Game(Base):
     __tablename__ = "games"
 
     id = Column(Integer, primary_key=True)
+    chat_id = Column(Integer)  # Добавляем chat_id
     status = Column(String, default="active")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
