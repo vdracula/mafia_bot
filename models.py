@@ -7,7 +7,7 @@ class Game(Base):
     __tablename__ = "games"
 
     id = Column(Integer, primary_key=True)
-    chat_id = Column(Integer)  # Добавляем chat_id
+    chat_id = Column(Integer)
     status = Column(String, default="active")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -45,7 +45,7 @@ class Vote(Base):
 
     id = Column(Integer, primary_key=True)
     voting_id = Column(Integer, ForeignKey("votings.id"))
-    player_id = Column(Integer, ForeignKey("players.id"))
-    target_player_id = Column(Integer, ForeignKey("players.id"))
+    voter_id = Column(Integer)
+    candidate_id = Column(Integer)
 
     voting = relationship("Voting", back_populates="votes")
