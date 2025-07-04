@@ -2,14 +2,12 @@ import asyncio
 import logging
 import os
 from aiogram import Bot, Dispatcher
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from models import Base
 from database import DATABASE_URL
 from handlers import main, game, voting
 
-load_dotenv()
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
