@@ -1,74 +1,123 @@
 import os
 import random
+import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-import asyncio
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-# Игровые данные
-players = {}          # user_id -> username
-roles = {}            # user_id -> роль
+players = {}
+roles = {}
 alive_players = set()
 votes = {}
 game_started = False
 
 ROLE_LIST = ["Мафия", "Доктор", "Комиссар", "Мирный"]
 
+# СТАРТОВОЕ МЕНЮ
+def get_main_menu():
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("🙋‍♂️ Присоединиться", callback_data="join"),
+        InlineKeyboardButton("👥 Список игроков", callback_data="status"),
+        InlineKeyboardButton("🎲 Начать игру", callback_data="startgame"),
+        InlineKeyboardButton("⚔️ Голосование", callback_data="vote")
+    )
+    return markup
+
+def back_to_menu():
+    return InlineKeyboardMarkup().add(
+        InlineKeyboardButton("🔙 В меню", callback_data="menu")
+    )
+
 # /start
 @dp.message(Command("start"))
 async def start(message: Message):
     await message.answer(
-        "Привет! Это Мафия-бот на aiogram v3.\n"
-        "Команды:\n"
-        "/join - присоединиться\n"
-        "/startgame - начать игру\n"
-        "/status - список игроков\n"
-        "/vote - голосование"
+        "👋 Привет! Это Мафия-бот.\nВыберите действие:",
+        reply_markup=get_main_menu()
     )
 
-# /join
-@dp.message(Command("join"))
-async def join(message: Message):
+# /menu
+@dp.message(Command("menu"))
+async def menu(message: Message):
+    await message.answer(
+        "📋 Главное меню:",
+        reply_markup=get_main_menu()
+    )
+
+# /help
+@dp.message(Command("help"))
+async def help_cmd(message: Message):
+    await message.answer(
+        "ℹ️ Бот для игры в мафию.\n"
+        "Используйте кнопки меню или команды:\n"
+        "/menu – открыть меню\n"
+        "/join – присоединиться\n"
+        "/startgame – начать игру\n"
+        "/status – список игроков\n"
+        "/vote – голосование"
+    )
+
+# Кнопки из меню
+@dp.callback_query(lambda c: c.data == "menu")
+async def cb_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "📋 Главное меню:",
+        reply_markup=get_main_menu()
+    )
+
+@dp.callback_query(lambda c: c.data == "join")
+async def cb_join(callback: CallbackQuery):
     global game_started
+    uid = callback.from_user.id
+    uname = callback.from_user.full_name
+
     if game_started:
-        await message.answer("Игра уже идёт!")
+        await callback.answer("Игра уже идёт!")
         return
-    uid = message.from_user.id
-    uname = message.from_user.full_name
     if uid in players:
-        await message.answer("Вы уже в игре.")
+        await callback.answer("Вы уже в игре.")
     else:
         players[uid] = uname
-        await message.answer(f"{uname} присоединился. Всего игроков: {len(players)}.")
+        await callback.message.answer(f"{uname} присоединился. Всего игроков: {len(players)}.")
 
-# /status
-@dp.message(Command("status"))
-async def status(message: Message):
+    await callback.message.edit_text(
+        "✅ Вы присоединились.",
+        reply_markup=back_to_menu()
+    )
+
+@dp.callback_query(lambda c: c.data == "status")
+async def cb_status(callback: CallbackQuery):
     if not players:
-        await message.answer("Никто не присоединился.")
-        return
-    text = "Игроки:\n" + "\n".join(f"- {n}" for n in players.values())
-    await message.answer(text)
+        text = "❌ Никто ещё не присоединился."
+    else:
+        text = "👥 Игроки:\n" + "\n".join(f"- {n}" for n in players.values())
+    await callback.message.edit_text(
+        text,
+        reply_markup=back_to_menu()
+    )
 
-# /startgame
-@dp.message(Command("startgame"))
-async def startgame(message: Message):
+@dp.callback_query(lambda c: c.data == "startgame")
+async def cb_startgame(callback: CallbackQuery):
     global game_started, alive_players
     if game_started:
-        await message.answer("Игра уже идёт.")
+        await callback.answer("Игра уже идёт.")
         return
     if len(players) < 3:
-        await message.answer("Нужно минимум 3 игрока.")
+        await callback.message.edit_text(
+            "❗ Нужно минимум 3 игрока.",
+            reply_markup=back_to_menu()
+        )
         return
 
     game_started = True
     alive_players = set(players.keys())
-    await message.answer("Игра началась. Роли рассылаются в личные сообщения.")
+    await callback.message.answer("🎮 Игра началась! Роли рассылаются в личные сообщения.")
 
     ids = list(players.keys())
     random.shuffle(ids)
@@ -91,13 +140,18 @@ async def startgame(message: Message):
         roles[uid] = "Мирный"
         await bot.send_message(uid, "Вы МИРНЫЙ житель.")
 
-    await message.answer("Роли розданы. Начинаем игру.")
+    await callback.message.edit_text(
+        "✅ Роли розданы.",
+        reply_markup=back_to_menu()
+    )
 
-# /vote
-@dp.message(Command("vote"))
-async def vote(message: Message):
+@dp.callback_query(lambda c: c.data == "vote")
+async def cb_vote(callback: CallbackQuery):
     if not game_started:
-        await message.answer("Игра ещё не началась.")
+        await callback.message.edit_text(
+            "⚠️ Игра ещё не началась.",
+            reply_markup=back_to_menu()
+        )
         return
 
     markup = InlineKeyboardMarkup()
@@ -105,9 +159,11 @@ async def vote(message: Message):
         markup.add(
             InlineKeyboardButton(players[uid], callback_data=f"vote_{uid}")
         )
-    await message.answer("Голосование. Кого казнить?", reply_markup=markup)
+    await callback.message.edit_text(
+        "⚔️ Голосование: кого казнить?",
+        reply_markup=markup
+    )
 
-# Обработка голосования
 @dp.callback_query(lambda c: c.data.startswith("vote_"))
 async def process_vote(callback: CallbackQuery):
     voter = callback.from_user.id
@@ -128,23 +184,22 @@ async def process_vote(callback: CallbackQuery):
         alive_players.remove(victim)
 
         text = (
-            f"{players[victim]} был казнён.\n"
+            f"☠️ {players[victim]} был казнён.\n"
             f"Он был ролью: {roles[victim]}."
         )
         await bot.send_message(callback.message.chat.id, text)
 
-        # Проверим победу
         mafia_alive = [uid for uid in alive_players if roles[uid] == "Мафия"]
         others_alive = [uid for uid in alive_players if roles[uid] != "Мафия"]
         if not mafia_alive:
-            await bot.send_message(callback.message.chat.id, "Мирные победили!")
+            await bot.send_message(callback.message.chat.id, "🎉 Мирные победили!")
             reset_game()
         elif len(mafia_alive) >= len(others_alive):
-            await bot.send_message(callback.message.chat.id, "Мафия победила!")
+            await bot.send_message(callback.message.chat.id, "💀 Мафия победила!")
             reset_game()
         else:
             votes.clear()
-            await bot.send_message(callback.message.chat.id, "Следующая ночь (в этой версии ночь вручную не реализована).")
+            await bot.send_message(callback.message.chat.id, "🌙 Наступает ночь (в этой версии ночь вручную).")
 
 def reset_game():
     global game_started, players, roles, alive_players, votes
