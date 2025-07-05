@@ -5,11 +5,12 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
-API_TOKEN = os.getenv("BOT_TOKEN")
+API_TOKEN = os.getenv("BOT_TOKEN")  # Укажи свой токен через переменную окружения
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
+# Глобальные переменные состояния
 players = {}
 roles = {}
 alive_players = set()
@@ -18,20 +19,26 @@ game_started = False
 
 ROLE_LIST = ["Мафия", "Доктор", "Комиссар", "Мирный"]
 
-# СТАРТОВОЕ МЕНЮ
+# Главное меню
 def get_main_menu():
-    markup = InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        InlineKeyboardButton("🙋‍♂️ Присоединиться", callback_data="join"),
-        InlineKeyboardButton("👥 Список игроков", callback_data="status"),
-        InlineKeyboardButton("🎲 Начать игру", callback_data="startgame"),
-        InlineKeyboardButton("⚔️ Голосование", callback_data="vote")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🙋‍♂️ Присоединиться", callback_data="join"),
+                InlineKeyboardButton(text="👥 Список игроков", callback_data="status")
+            ],
+            [
+                InlineKeyboardButton(text="🎲 Начать игру", callback_data="startgame"),
+                InlineKeyboardButton(text="⚔️ Голосование", callback_data="vote")
+            ]
+        ]
     )
-    return markup
 
 def back_to_menu():
-    return InlineKeyboardMarkup().add(
-        InlineKeyboardButton("🔙 В меню", callback_data="menu")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 В меню", callback_data="menu")]
+        ]
     )
 
 # /start
@@ -63,7 +70,7 @@ async def help_cmd(message: Message):
         "/vote – голосование"
     )
 
-# Кнопки из меню
+# Кнопка: меню
 @dp.callback_query(lambda c: c.data == "menu")
 async def cb_menu(callback: CallbackQuery):
     await callback.message.edit_text(
@@ -71,6 +78,7 @@ async def cb_menu(callback: CallbackQuery):
         reply_markup=get_main_menu()
     )
 
+# Кнопка: присоединиться
 @dp.callback_query(lambda c: c.data == "join")
 async def cb_join(callback: CallbackQuery):
     global game_started
@@ -80,8 +88,9 @@ async def cb_join(callback: CallbackQuery):
     if game_started:
         await callback.answer("Игра уже идёт!")
         return
+
     if uid in players:
-        await callback.answer("Вы уже в игре.")
+        await callback.answer("Вы уже присоединились.")
     else:
         players[uid] = uname
         await callback.message.answer(f"{uname} присоединился. Всего игроков: {len(players)}.")
@@ -91,17 +100,20 @@ async def cb_join(callback: CallbackQuery):
         reply_markup=back_to_menu()
     )
 
+# Кнопка: статус
 @dp.callback_query(lambda c: c.data == "status")
 async def cb_status(callback: CallbackQuery):
     if not players:
         text = "❌ Никто ещё не присоединился."
     else:
         text = "👥 Игроки:\n" + "\n".join(f"- {n}" for n in players.values())
+
     await callback.message.edit_text(
         text,
         reply_markup=back_to_menu()
     )
 
+# Кнопка: начать игру
 @dp.callback_query(lambda c: c.data == "startgame")
 async def cb_startgame(callback: CallbackQuery):
     global game_started, alive_players
@@ -145,6 +157,7 @@ async def cb_startgame(callback: CallbackQuery):
         reply_markup=back_to_menu()
     )
 
+# Кнопка: голосование
 @dp.callback_query(lambda c: c.data == "vote")
 async def cb_vote(callback: CallbackQuery):
     if not game_started:
@@ -154,16 +167,23 @@ async def cb_vote(callback: CallbackQuery):
         )
         return
 
-    markup = InlineKeyboardMarkup()
-    for uid in alive_players:
-        markup.add(
-            InlineKeyboardButton(players[uid], callback_data=f"vote_{uid}")
-        )
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=players[uid],
+                    callback_data=f"vote_{uid}"
+                )
+            ] for uid in alive_players
+        ]
+    )
+
     await callback.message.edit_text(
         "⚔️ Голосование: кого казнить?",
         reply_markup=markup
     )
 
+# Обработка голосов
 @dp.callback_query(lambda c: c.data.startswith("vote_"))
 async def process_vote(callback: CallbackQuery):
     voter = callback.from_user.id
