@@ -5,8 +5,10 @@ from collections import Counter
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from aiogram.enums import ParseMode
+import os
 
-TOKEN = "ВАШ_ТОКЕН_ЗДЕСЬ"  # <-- вставь свой токен
+# Читаем токен из переменной окружения
+TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
@@ -25,13 +27,12 @@ ROLE_IMAGES = {
     ]
 }
 
-players = {}         # user_id: username
-roles = {}           # user_id: роль
+players = {}        # user_id -> username
+roles = {}          # user_id -> роль
 alive_players = set()
-votes = {}           # user_id: за кого голосует
+votes = {}
 game_started = False
 
-# Кнопки
 def get_main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ Присоединиться", callback_data="join")],
@@ -40,14 +41,13 @@ def get_main_menu():
 
 def back_to_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Вернуться в меню", callback_data="menu")]
+        [InlineKeyboardButton(text="🔙 Меню", callback_data="menu")]
     ])
 
-# Команда старт
 @dp.message(commands=["start"])
 async def start(message: types.Message):
     await message.answer(
-        "👋 <b>Добро пожаловать в игру Мафия!</b>\n\n"
+        "👋 <b>Добро пожаловать в игру Мафия!</b>\n"
         "Нажмите кнопку, чтобы присоединиться или начать игру.",
         reply_markup=get_main_menu()
     )
@@ -69,7 +69,7 @@ async def cb_join(callback: CallbackQuery):
     else:
         await callback.answer("Вы уже в игре.")
     await callback.message.edit_text(
-        f"👥 Игроки:\n" + "\n".join(players.values()),
+        "👥 Игроки:\n" + "\n".join(players.values()),
         reply_markup=get_main_menu()
     )
 
@@ -88,7 +88,7 @@ async def cb_startgame(callback: CallbackQuery):
 
     game_started = True
     alive_players = set(players.keys())
-    await callback.message.answer("🎮 Игра началась! Роли рассылаются в личные сообщения.")
+    await callback.message.answer("🎮 Игра началась! Роли рассылаются...")
 
     ids = list(players.keys())
     random.shuffle(ids)
@@ -109,82 +109,64 @@ async def cb_startgame(callback: CallbackQuery):
     for uid in ids:
         roles[uid] = "Мирный"
 
-    # Рассылаем роли с картинками
     for uid, role in roles.items():
-        image_data = ROLE_IMAGES[role]
-        if isinstance(image_data, list):
-            image = random.choice(image_data)
-        else:
-            image = image_data
-
-        caption = f"Ваша роль: {role}"
-
-        with open(image, "rb") as photo_file:
-            await bot.send_photo(uid, photo=photo_file, caption=caption)
+        img_data = ROLE_IMAGES[role]
+        img_path = random.choice(img_data) if isinstance(img_data, list) else img_data
+        with open(img_path, "rb") as photo:
+            await bot.send_photo(uid, photo=photo, caption=f"Ваша роль: {role}")
 
     await callback.message.edit_text(
-        "✅ Роли розданы.\n\nЧтобы начать голосование, используйте команду /vote",
+        "✅ Роли розданы.\n\nЧтобы начать голосование, напишите команду:\n/vote",
         reply_markup=back_to_menu()
     )
 
-# Команда для старта голосования
 @dp.message(commands=["vote"])
 async def vote(message: types.Message):
     if not game_started:
         await message.answer("Игра ещё не началась.")
         return
-
     for uid in alive_players:
         kb = InlineKeyboardMarkup(row_width=1)
-        for target_id in alive_players:
-            if uid == target_id:
+        for tid in alive_players:
+            if uid == tid:
                 continue
             kb.add(InlineKeyboardButton(
-                text=players[target_id],
-                callback_data=f"vote_{target_id}"
+                text=players[tid],
+                callback_data=f"vote_{tid}"
             ))
-        await bot.send_message(uid, "🔘 Выберите, за кого голосуете:", reply_markup=kb)
+        await bot.send_message(uid, "🔘 За кого голосуете?", reply_markup=kb)
 
-# Обработка голосов
 @dp.callback_query(lambda c: c.data and c.data.startswith("vote_"))
 async def cb_vote(callback: CallbackQuery):
     voter = callback.from_user.id
     if voter not in alive_players:
         await callback.answer("Вы не можете голосовать.")
         return
-    target_id = int(callback.data.split("_")[1])
-    if target_id not in alive_players:
-        await callback.answer("Игрок уже выбыл.")
+    target = int(callback.data.split("_")[1])
+    if target not in alive_players:
+        await callback.answer("Этот игрок уже выбыл.")
         return
-    votes[voter] = target_id
-    await callback.answer("Ваш голос принят.")
+    votes[voter] = target
+    await callback.answer("Голос принят.")
 
-    # Проверим, все ли проголосовали
     if len(votes) == len(alive_players):
         await tally_votes(callback.message.chat.id)
 
-# Подсчёт голосов
 async def tally_votes(chat_id):
+    global votes
     tally = Counter(votes.values())
     text = "📊 <b>Результаты голосования:</b>\n"
     for uid, count in tally.items():
-        text += f"▫️ {players[uid]} — {count} голос(ов)\n"
-
-    # Игрок с максимумом голосов
+        text += f"{players[uid]} — {count} голос(ов)\n"
     if tally:
-        eliminated_id, _ = tally.most_common(1)[0]
-        alive_players.remove(eliminated_id)
-        text += f"\n☠️ {players[eliminated_id]} выбыл из игры."
-
+        eliminated, _ = tally.most_common(1)[0]
+        alive_players.discard(eliminated)
+        text += f"\n☠️ {players[eliminated]} выбыл из игры."
     else:
         text += "\nНикто не выбыл."
-
-    # Очищаем голоса
     votes.clear()
-
     await bot.send_message(chat_id, text)
 
-# Запуск
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     asyncio.run(dp.start_polling(bot))
