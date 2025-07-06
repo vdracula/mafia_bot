@@ -5,7 +5,8 @@ import random
 from collections import Counter
 from datetime import datetime
 
-from aiogram import Bot, Dispatcher, types, DefaultBotProperties
+from aiogram import Bot, Dispatcher, types
+from aiogram.client.default import DefaultBotProperties
 from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 )
