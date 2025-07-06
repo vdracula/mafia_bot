@@ -37,7 +37,7 @@ class Database:
                     winner_side TEXT
                 );
             """)
-            # Участники игры
+            # Участники
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS game_participants (
                     game_id INTEGER REFERENCES games(id),
@@ -46,7 +46,7 @@ class Database:
                     alive BOOLEAN
                 );
             """)
-            # Картинки ролей
+            # Картинки
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS role_images (
                     id SERIAL PRIMARY KEY,
@@ -113,7 +113,7 @@ class Database:
             """, datetime.utcnow(), winner, game_id)
 
             participants = await conn.fetch("""
-                SELECT user_id, role, alive FROM game_participants
+                SELECT user_id, role FROM game_participants
                 WHERE game_id=$1;
             """, game_id)
 
