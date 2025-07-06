@@ -173,20 +173,6 @@ async def stats(message: Message, db: Database):
     else:
         text = "Нет данных о статистике."
     await message.answer(text)
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
-    async def main():
-        db = Database(DB_URL)
-        if not DB_URL:
-            raise ValueError("DATABASE_URL не установлен!")
-        await db.connect()
-        dp.workflow_data["db"] = db
-        await dp.start_polling(bot)
-
-    asyncio.run(main())
-
 @dp.message(Command("endgame"))
 async def endgame(message: Message, db: Database):
     chat_id = message.chat.id
@@ -207,3 +193,17 @@ async def endgame(message: Message, db: Database):
     ongoing_games.pop(chat_id)
 
     await message.answer("🛑 Игра принудительно завершена ведущим.")
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
+    async def main():
+        db = Database(DB_URL)
+        if not DB_URL:
+            raise ValueError("DATABASE_URL не установлен!")
+        await db.connect()
+        dp.workflow_data["db"] = db
+        await dp.start_polling(bot)
+
+    asyncio.run(main())
+
