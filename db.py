@@ -16,6 +16,7 @@ class Database:
 
     async def setup(self):
         async with self.pool.acquire() as conn:
+            # Игроки
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS players (
                     id BIGINT PRIMARY KEY,
@@ -26,6 +27,7 @@ class Database:
                     citizen_wins INTEGER DEFAULT 0
                 );
             """)
+            # Игры
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS games (
                     id SERIAL PRIMARY KEY,
@@ -35,6 +37,7 @@ class Database:
                     winner_side TEXT
                 );
             """)
+            # Участники игры
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS game_participants (
                     game_id INTEGER REFERENCES games(id),
@@ -43,9 +46,11 @@ class Database:
                     alive BOOLEAN
                 );
             """)
+            # Картинки ролей
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS role_images (
-                    role TEXT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
+                    role TEXT,
                     image BYTEA
                 );
             """)
@@ -75,18 +80,19 @@ class Database:
             """, game_id, user_id, role)
 
     async def get_role_image(self, role):
-    async with self.pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT image FROM role_images WHERE role=$1;
-        """, role)
-        if rows:
-            return random.choice(rows)["image"]
-        return None
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT image FROM role_images WHERE role=$1;
+            """, role)
+            if rows:
+                return random.choice(rows)["image"]
+            return None
 
     async def mark_dead(self, game_id, user_id):
         async with self.pool.acquire() as conn:
             await conn.execute("""
-                UPDATE game_participants SET alive=FALSE
+                UPDATE game_participants
+                SET alive=FALSE
                 WHERE game_id=$1 AND user_id=$2;
             """, game_id, user_id)
 
@@ -101,7 +107,8 @@ class Database:
     async def finalize_game(self, game_id, winner):
         async with self.pool.acquire() as conn:
             await conn.execute("""
-                UPDATE games SET end_time=$1, winner_side=$2
+                UPDATE games
+                SET end_time=$1, winner_side=$2
                 WHERE id=$3;
             """, datetime.utcnow(), winner, game_id)
 
