@@ -23,13 +23,24 @@ bot = Bot(
 )
 dp = Dispatcher()
 
+# В памяти только активные игры
 ongoing_games = {}
 
 def get_main_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton("🙋 Присоединиться", callback_data="join")],
-            [InlineKeyboardButton("🎲 Начать игру", callback_data="startgame")]
+            [
+                InlineKeyboardButton(
+                    text="🙋 Присоединиться",
+                    callback_data="join"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎲 Начать игру",
+                    callback_data="startgame"
+                )
+            ]
         ]
     )
 
@@ -50,6 +61,7 @@ async def startgame(callback: CallbackQuery, db: Database):
     chat_id = callback.message.chat.id
     game_id = await db.create_game(chat_id)
 
+    # Получаем админов (для примера)
     members = await bot.get_chat_administrators(chat_id)
     ids = [m.user.id for m in members if not m.user.is_bot]
 
@@ -76,7 +88,12 @@ async def startgame(callback: CallbackQuery, db: Database):
             await bot.send_message(uid, caption)
         alive[uid] = role
 
-    ongoing_games[chat_id] = {"game_id": game_id, "alive_players": alive, "votes": {}}
+    ongoing_games[chat_id] = {
+        "game_id": game_id,
+        "alive_players": alive,
+        "votes": {}
+    }
+
     await callback.message.answer("Игра началась!")
 
 @dp.message(Command("vote"))
@@ -89,7 +106,12 @@ async def vote(message: Message):
 
     markup = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(str(uid), callback_data=f"vote_{uid}")]
+            [
+                InlineKeyboardButton(
+                    text=f"👤 {uid}",
+                    callback_data=f"vote_{uid}"
+                )
+            ]
             for uid in game["alive_players"]
         ]
     )
@@ -118,7 +140,7 @@ async def process_vote(callback: CallbackQuery, db: Database):
         await db.mark_dead(game["game_id"], eliminated)
         role = game["alive_players"].pop(eliminated)
 
-        await bot.send_message(chat_id, f"{eliminated} выбыл. Его роль: {role}")
+        await bot.send_message(chat_id, f"👤 {eliminated} выбыл. Его роль: {role}")
 
         mafia_left = [r for r in game["alive_players"].values() if r == "Мафия"]
         citizens_left = [r for r in game["alive_players"].values() if r != "Мафия"]
@@ -142,10 +164,11 @@ async def stats(message: Message, db: Database):
     row = await db.get_player_stats(message.from_user.id)
     if row:
         text = (
-            f"Игры сыграно: {row['games_played']}\n"
-            f"Побед: {row['games_won']}\n"
-            f"Побед за мафию: {row['mafia_wins']}\n"
-            f"Побед за мирных: {row['citizen_wins']}"
+            f"👤 Статистика:\n"
+            f"• Игры сыграно: {row['games_played']}\n"
+            f"• Побед: {row['games_won']}\n"
+            f"• Побед за мафию: {row['mafia_wins']}\n"
+            f"• Побед за мирных: {row['citizen_wins']}"
         )
     else:
         text = "Нет данных о статистике."
