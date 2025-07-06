@@ -186,3 +186,18 @@ if __name__ == "__main__":
         await dp.start_polling(bot)
 
     asyncio.run(main())
+    
+@dp.message(Command("endgame"))
+async def endgame(message: Message, db: Database):
+    chat_id = message.chat.id
+    game = ongoing_games.get(chat_id)
+    if not game:
+        await message.answer("Нет активной игры.")
+        return
+
+    # Завершаем игру в базе
+    await db.finalize_game(game["game_id"], winner="Прервано")
+    # Удаляем из памяти
+    ongoing_games.pop(chat_id)
+
+    await message.answer("Игра принудительно завершена.")
