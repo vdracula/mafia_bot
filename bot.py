@@ -59,7 +59,8 @@ async def join(callback: CallbackQuery, db: Database):
 @dp.callback_query(lambda c: c.data == "startgame")
 async def startgame(callback: CallbackQuery, db: Database):
     chat_id = callback.message.chat.id
-    game_id = await db.create_game(chat_id)
+    chat_title = callback.message.chat.title or "Без названия"
+    game_id = await db.create_game(chat_id, chat_title)
 
     # Получаем админов (для примера)
     members = await bot.get_chat_administrators(chat_id)

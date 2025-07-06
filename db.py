@@ -32,6 +32,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS games (
                     id SERIAL PRIMARY KEY,
                     chat_id BIGINT,
+                    chat_title TEXT,
                     start_time TIMESTAMP,
                     end_time TIMESTAMP,
                     winner_side TEXT
@@ -55,13 +56,13 @@ class Database:
                 );
             """)
 
-    async def create_game(self, chat_id):
+    async def create_game(self, chat_id, chat_title):
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("""
-                INSERT INTO games(chat_id, start_time)
-                VALUES($1, $2)
+                INSERT INTO games(chat_id, chat_title, start_time)
+                VALUES($1, $2, $3)
                 RETURNING id;
-            """, chat_id, datetime.utcnow())
+            """, chat_id, chat_title, datetime.utcnow())
             return row["id"]
 
     async def add_player(self, user_id, username):
