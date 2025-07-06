@@ -5,7 +5,7 @@ import random
 from collections import Counter
 from datetime import datetime
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, DefaultBotProperties
 from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 )
@@ -16,7 +16,11 @@ import asyncpg
 TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(
+    token=TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
+
 dp = Dispatcher()
 
 players = {}
