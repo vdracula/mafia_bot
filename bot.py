@@ -4,6 +4,7 @@ import os
 import random
 from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import (
     InlineKeyboardMarkup,
@@ -20,7 +21,7 @@ DB_URL = os.getenv("DATABASE_URL")
 # Создаём бота с поддержкой HTML
 bot = Bot(
     token=TOKEN,
-    default=DefaultBotProperties(parse_mode=types.ParseMode.HTML)
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
 dp = Dispatcher()
 
