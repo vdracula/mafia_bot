@@ -1,172 +1,238 @@
 import asyncio
-import random
 import logging
-from collections import Counter
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from aiogram.enums import ParseMode
 import os
+import random
+from collections import Counter
+from datetime import datetime
 
-# Читаем токен из переменной окружения
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import (
+    InlineKeyboardMarkup, InlineKeyboardButton, InputFile
+)
+from aiogram.enums import ParseMode
+
+import asyncpg
+
 TOKEN = os.getenv("BOT_TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
-ROLE_IMAGES = {
-    "Мафия": [
-        "images/mafia1.jpg",
-        "images/mafia2.jpg",
-        "images/mafia3.jpg"
-    ],
-    "Доктор": "images/doctor.jpg",
-    "Комиссар": "images/commissar.jpg",
-    "Мирный": [
-        "images/citizen1.jpg",
-        "images/citizen2.jpg"
-    ]
-}
-
-players = {}        # user_id -> username
-roles = {}          # user_id -> роль
+players = {}
+roles = {}
 alive_players = set()
 votes = {}
 game_started = False
+current_game_id = None
+
+async def create_db_pool():
+    return await asyncpg.create_pool(DATABASE_URL)
+
+async def setup_database(pool):
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS players (
+                id BIGINT PRIMARY KEY,
+                username TEXT,
+                games_played INTEGER DEFAULT 0,
+                games_won INTEGER DEFAULT 0,
+                mafia_wins INTEGER DEFAULT 0,
+                citizen_wins INTEGER DEFAULT 0
+            );
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS games (
+                id SERIAL PRIMARY KEY,
+                start_time TIMESTAMP,
+                end_time TIMESTAMP,
+                winner_side TEXT
+            );
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS game_participants (
+                game_id INTEGER REFERENCES games(id),
+                user_id BIGINT REFERENCES players(id),
+                role TEXT,
+                survived BOOLEAN
+            );
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS role_images (
+                role TEXT PRIMARY KEY,
+                image BYTEA
+            );
+        """)
 
 def get_main_menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="➕ Присоединиться", callback_data="join")],
-        [InlineKeyboardButton(text="🚀 Начать игру", callback_data="startgame")]
-    ])
-
-def back_to_menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Меню", callback_data="menu")]
-    ])
-
-@dp.message(commands=["start"])
-async def start(message: types.Message):
-    await message.answer(
-        "👋 <b>Добро пожаловать в игру Мафия!</b>\n"
-        "Нажмите кнопку, чтобы присоединиться или начать игру.",
-        reply_markup=get_main_menu()
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton("➕ Присоединиться", callback_data="join")],
+            [InlineKeyboardButton("🚀 Начать игру", callback_data="startgame")]
+        ]
     )
 
-@dp.callback_query(lambda c: c.data == "menu")
-async def cb_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "🏠 Главное меню",
+@dp.message(commands=["start"])
+async def cmd_start(message: types.Message):
+    await message.answer(
+        "👋 Добро пожаловать в игру Мафия!\nНажмите кнопку, чтобы присоединиться.",
         reply_markup=get_main_menu()
     )
 
 @dp.callback_query(lambda c: c.data == "join")
-async def cb_join(callback: CallbackQuery):
+async def cb_join(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     username = callback.from_user.full_name
-    if user_id not in players:
-        players[user_id] = username
-        await callback.answer("✅ Вы присоединились.")
-    else:
-        await callback.answer("Вы уже в игре.")
-    await callback.message.edit_text(
-        "👥 Игроки:\n" + "\n".join(players.values()),
-        reply_markup=get_main_menu()
-    )
+    players[user_id] = username
+    await callback.message.answer(f"{username} присоединился!")
 
 @dp.callback_query(lambda c: c.data == "startgame")
-async def cb_startgame(callback: CallbackQuery):
-    global game_started, alive_players
+async def cb_start(callback: types.CallbackQuery, db_pool):
+    global game_started, alive_players, current_game_id
     if game_started:
-        await callback.answer("Игра уже идёт.")
+        await callback.answer("Игра уже началась.")
         return
     if len(players) < 3:
-        await callback.message.edit_text(
-            "❗ Нужно минимум 3 игрока.",
-            reply_markup=back_to_menu()
-        )
+        await callback.message.answer("Нужно минимум 3 игрока.")
         return
 
     game_started = True
     alive_players = set(players.keys())
-    await callback.message.answer("🎮 Игра началась! Роли рассылаются...")
+    votes.clear()
+
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            INSERT INTO games(start_time) VALUES($1) RETURNING id;
+        """, datetime.utcnow())
+        current_game_id = row["id"]
+
+        for uid, username in players.items():
+            await conn.execute("""
+                INSERT INTO players(id, username)
+                VALUES($1, $2)
+                ON CONFLICT (id) DO UPDATE SET username=EXCLUDED.username;
+            """, uid, username)
 
     ids = list(players.keys())
-    random.shuffle(ids)
-
-    mafia_count = 2 if len(ids) >= 5 else 1
-    mafia_ids = [ids.pop() for _ in range(mafia_count)]
-    for uid in mafia_ids:
-        roles[uid] = "Мафия"
-
-    doctor = ids.pop() if ids else None
-    if doctor:
-        roles[doctor] = "Доктор"
-
-    commissar = ids.pop() if ids else None
-    if commissar:
-        roles[commissar] = "Комиссар"
-
+    mafia = random.sample(ids, k=2 if len(ids) >= 5 else 1)
     for uid in ids:
-        roles[uid] = "Мирный"
+        role = "Мафия" if uid in mafia else "Мирный"
+        roles[uid] = role
+        await send_role(uid, role, db_pool)
 
-    for uid, role in roles.items():
-        img_data = ROLE_IMAGES[role]
-        img_path = random.choice(img_data) if isinstance(img_data, list) else img_data
-        with open(img_path, "rb") as photo:
-            await bot.send_photo(uid, photo=photo, caption=f"Ваша роль: {role}")
-
-    await callback.message.edit_text(
-        "✅ Роли розданы.\n\nЧтобы начать голосование, напишите команду:\n/vote",
-        reply_markup=back_to_menu()
-    )
+async def send_role(user_id, role, db_pool):
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT image FROM role_images WHERE role=$1;
+        """, role)
+        if row and row["image"]:
+            await bot.send_photo(
+                user_id,
+                types.BufferedInputFile(row["image"], filename=f"{role}.jpg"),
+                caption=f"Ваша роль: {role}"
+            )
+        else:
+            await bot.send_message(user_id, f"Ваша роль: {role}")
 
 @dp.message(commands=["vote"])
-async def vote(message: types.Message):
+async def cmd_vote(message: types.Message):
     if not game_started:
         await message.answer("Игра ещё не началась.")
         return
     for uid in alive_players:
         kb = InlineKeyboardMarkup(row_width=1)
-        for tid in alive_players:
-            if uid == tid:
+        for target in alive_players:
+            if uid == target:
                 continue
-            kb.add(InlineKeyboardButton(
-                text=players[tid],
-                callback_data=f"vote_{tid}"
-            ))
-        await bot.send_message(uid, "🔘 За кого голосуете?", reply_markup=kb)
+            kb.add(InlineKeyboardButton(players[target], callback_data=f"vote_{target}"))
+        await bot.send_message(uid, "Голосуйте:", reply_markup=kb)
 
-@dp.callback_query(lambda c: c.data and c.data.startswith("vote_"))
-async def cb_vote(callback: CallbackQuery):
+@dp.callback_query(lambda c: c.data.startswith("vote_"))
+async def cb_vote(callback: types.CallbackQuery, db_pool):
     voter = callback.from_user.id
-    if voter not in alive_players:
-        await callback.answer("Вы не можете голосовать.")
-        return
     target = int(callback.data.split("_")[1])
-    if target not in alive_players:
-        await callback.answer("Этот игрок уже выбыл.")
-        return
     votes[voter] = target
     await callback.answer("Голос принят.")
 
     if len(votes) == len(alive_players):
-        await tally_votes(callback.message.chat.id)
-
-async def tally_votes(chat_id):
-    global votes
-    tally = Counter(votes.values())
-    text = "📊 <b>Результаты голосования:</b>\n"
-    for uid, count in tally.items():
-        text += f"{players[uid]} — {count} голос(ов)\n"
-    if tally:
+        tally = Counter(votes.values())
         eliminated, _ = tally.most_common(1)[0]
-        alive_players.discard(eliminated)
-        text += f"\n☠️ {players[eliminated]} выбыл из игры."
-    else:
-        text += "\nНикто не выбыл."
+        alive_players.remove(eliminated)
+
+        if roles[eliminated] == "Мафия":
+            winner = "Мирные"
+        elif all(roles[uid] == "Мафия" for uid in alive_players):
+            winner = "Мафия"
+        else:
+            winner = None
+
+        if winner:
+            await finalize_game(db_pool, winner)
+        else:
+            votes.clear()
+            await bot.send_message(callback.message.chat.id, f"{players[eliminated]} выбыл!")
+
+async def finalize_game(db_pool, winner_side):
+    global game_started, players, roles, alive_players, votes, current_game_id
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE games SET end_time=$1, winner_side=$2 WHERE id=$3;
+        """, datetime.utcnow(), winner_side, current_game_id)
+        for uid in players:
+            survived = uid in alive_players
+            await conn.execute("""
+                INSERT INTO game_participants(game_id, user_id, role, survived)
+                VALUES($1, $2, $3, $4);
+            """, current_game_id, uid, roles[uid], survived)
+
+            # Обновляем статистику
+            await conn.execute("""
+                UPDATE players
+                SET games_played = games_played + 1,
+                    games_won = games_won + CASE WHEN
+                        ($1='Мафия' AND role='Мафия') OR
+                        ($1='Мирные' AND role='Мирный')
+                    THEN 1 ELSE 0 END,
+                    mafia_wins = mafia_wins + CASE WHEN ($1='Мафия' AND role='Мафия') THEN 1 ELSE 0 END,
+                    citizen_wins = citizen_wins + CASE WHEN ($1='Мирные' AND role='Мирный') THEN 1 ELSE 0 END
+                WHERE id=$2;
+            """, winner_side, uid)
+
+    await bot.send_message(
+        list(players.keys())[0],
+        f"🎉 Игра окончена! Победили: {winner_side}"
+    )
+    game_started = False
+    players.clear()
+    roles.clear()
+    alive_players.clear()
     votes.clear()
-    await bot.send_message(chat_id, text)
+    current_game_id = None
+
+@dp.message(commands=["stats"])
+async def cmd_stats(message: types.Message, db_pool):
+    uid = message.from_user.id
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT games_played, games_won, mafia_wins, citizen_wins FROM players WHERE id=$1;
+        """, uid)
+        if row:
+            text = (
+                f"Ваши игры:\n"
+                f"Всего игр: {row['games_played']}\n"
+                f"Побед: {row['games_won']}\n"
+                f"Побед за Мафию: {row['mafia_wins']}\n"
+                f"Побед за Мирных: {row['citizen_wins']}"
+            )
+        else:
+            text = "Вы ещё не играли."
+        await message.answer(text)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(dp.start_polling(bot))
+    async def main():
+        db_pool = await create_db_pool()
+        await setup_database(db_pool)
+        dp.workflow_data["db_pool"] = db_pool
+        await dp.start_polling(bot)
+    asyncio.run(main())
