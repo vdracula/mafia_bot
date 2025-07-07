@@ -36,7 +36,6 @@ async def cmd_start(message: Message):
         [InlineKeyboardButton(text="🎮 Создать игру", callback_data="create_lobby")],
         [InlineKeyboardButton(text="📊 Моя статистика", callback_data="my_stats")]
         [InlineKeyboardButton(text="📊 Статистика игр", callback_data="all_stats")]
-        
     ]
     await message.answer("👋 Привет! Что хотите сделать?",
                          reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
