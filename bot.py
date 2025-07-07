@@ -27,9 +27,7 @@ def get_lobby_menu(is_host=False):
             [InlineKeyboardButton(text="▶️ Начать игру", callback_data="start_lobby")],
             [InlineKeyboardButton(text="🛑 Завершить игру", callback_data="end_game")],
             [InlineKeyboardButton(text="🗳 Начать голосование", callback_data="start_vote")],
-            [InlineKeyboardButton(text="📊 Вся статистика", callback_data="all_stats")]
         ]
-    buttons += [[InlineKeyboardButton(text="📊 Моя статистика", callback_data="my_stats")]]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 @dp.message(Command("start"))
@@ -37,6 +35,8 @@ async def cmd_start(message: Message):
     buttons = [
         [InlineKeyboardButton(text="🎮 Создать игру", callback_data="create_lobby")],
         [InlineKeyboardButton(text="📊 Моя статистика", callback_data="my_stats")]
+        [InlineKeyboardButton(text="📊 Статистика игр", callback_data="all_stats")]
+        
     ]
     await message.answer("👋 Привет! Что хотите сделать?",
                          reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
@@ -209,10 +209,6 @@ async def all_stats(callback: CallbackQuery, db: Database):
     cid = callback.message.chat.id
     uid = callback.from_user.id
     game = ongoing_games.get(cid)
-
-    if not game or game["host_id"] != uid:
-        await callback.message.answer("❌ Только ведущий может смотреть статистику.")
-        return
 
     rows = await db.get_all_player_stats()
     if not rows:
