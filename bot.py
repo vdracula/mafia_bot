@@ -182,12 +182,13 @@ async def end_game(callback: CallbackQuery, db: Database):
     game = ongoing_games.get(cid)
 
     if not game or game["host_id"] != uid:
-        await callback.message.answer("❌ Только ведущий может завершить игру.")
+        await callback.answer("❌ Только ведущий может завершить игру.", show_alert=True)
         return
 
     await db.finalize_game(game["game_id"], "Прервано")
     ongoing_games.pop(cid, None)
-    await callback.message.answer("🛑 Игра завершена ведущим.")
+    await callback.message.reply("🛑 Игра завершена ведущим.")
+    await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "my_stats")
 async def my_stats(callback: CallbackQuery, db: Database):
