@@ -26,7 +26,7 @@ def get_lobby_menu(is_host=False):
         buttons += [
             [InlineKeyboardButton(text="▶️ Начать игру", callback_data="start_lobby")],
             [InlineKeyboardButton(text="🛑 Завершить игру", callback_data="end_game")],
-            [InlineKeyboardButton(text="🗳 Начать голосование", callback_data="start_vote")],
+            [InlineKeyboardButton(text="🗳 Начать голосование", callback_data="start_vote")]
         ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -34,7 +34,7 @@ def get_lobby_menu(is_host=False):
 async def cmd_start(message: Message):
     buttons = [
         [InlineKeyboardButton(text="🎮 Создать игру", callback_data="create_lobby")],
-        [InlineKeyboardButton(text="📊 Моя статистика", callback_data="my_stats")]
+        [InlineKeyboardButton(text="📊 Моя статистика", callback_data="my_stats")],
         [InlineKeyboardButton(text="📊 Статистика игр", callback_data="all_stats")]
     ]
     await message.answer("👋 Привет! Что хотите сделать?",
