@@ -98,33 +98,33 @@ class Database:
             return {r["user_id"]: r["role"] for r in rows}
 
     async def finalize_game(self, game_id, winner):
-    async with self.pool.acquire() as conn:
-        await conn.execute("""
-            UPDATE games SET end_time=$1, winner_side=$2
-            WHERE id=$3;
-        """, datetime.utcnow(), winner, game_id)
-
-        participants = await conn.fetch("""
-            SELECT user_id, role FROM game_participants
-            WHERE game_id=$1;
-        """, game_id)
-
-        for p in participants:
-            user_id = p["user_id"]
-            role = p["role"]
-
-            games_won_inc = 1 if (winner == "Мафия" and role == "Мафия") or (winner == "Мирные" and role != "Мафия") else 0
-            mafia_wins_inc = 1 if winner == "Мафия" and role == "Мафия" else 0
-            citizen_wins_inc = 1 if winner == "Мирные" and role != "Мафия" else 0
-
+        async with self.pool.acquire() as conn:
             await conn.execute("""
-                UPDATE players
-                SET games_played = games_played + 1,
-                    games_won = games_won + $1,
-                    mafia_wins = mafia_wins + $2,
-                    citizen_wins = citizen_wins + $3
-                WHERE id = $4;
-            """, games_won_inc, mafia_wins_inc, citizen_wins_inc, user_id)
+                UPDATE games SET end_time=$1, winner_side=$2
+                WHERE id=$3;
+            """, datetime.utcnow(), winner, game_id)
+
+            participants = await conn.fetch("""
+                SELECT user_id, role FROM game_participants
+                WHERE game_id=$1;
+            """, game_id)
+
+            for p in participants:
+                user_id = p["user_id"]
+                role = p["role"]
+
+                games_won_inc = 1 if (winner == "Мафия" and role == "Мафия") or (winner == "Мирные" and role != "Мафия") else 0
+                mafia_wins_inc = 1 if winner == "Мафия" and role == "Мафия" else 0
+                citizen_wins_inc = 1 if winner == "Мирные" and role != "Мафия" else 0
+
+                await conn.execute("""
+                    UPDATE players
+                    SET games_played = games_played + 1,
+                        games_won = games_won + $1,
+                        mafia_wins = mafia_wins + $2,
+                        citizen_wins = citizen_wins + $3
+                    WHERE id = $4;
+                """, games_won_inc, mafia_wins_inc, citizen_wins_inc, user_id)
 
     async def get_player_stats(self, user_id):
         async with self.pool.acquire() as conn:
