@@ -79,7 +79,7 @@ async def start_lobby(callback: CallbackQuery, db: Database):
 
     lobby = lobbies.get(chat_id)
     if not lobby or lobby["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может начать игру.")
+        await callback.message.answer("❌ Только ведущий может начать игру. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
         return
 
     players = list(lobby["players"].keys())
@@ -124,7 +124,7 @@ async def start_vote(callback: CallbackQuery):
     user_id = callback.from_user.id
     game = ongoing_games.get(chat_id)
     if not game or game["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может начать голосование.")
+        await callback.message.answer("❌ Только ведущий может начать голосование. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
         return
 
     markup = InlineKeyboardMarkup(
@@ -184,7 +184,7 @@ async def end_game(callback: CallbackQuery, db: Database):
     user_id = callback.from_user.id
     game = ongoing_games.get(chat_id)
     if not game or game["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может завершить игру.")
+        await callback.message.answer("❌ Только ведущий может завершить игру. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
         return
 
     await db.finalize_game(game["game_id"], winner="Прервано")
@@ -212,7 +212,7 @@ async def all_stats(callback: CallbackQuery, db: Database):
     user_id = callback.from_user.id
     game = ongoing_games.get(chat_id)
     if not game or game["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может смотреть общую статистику.")
+        await callback.message.answer("❌ Только ведущий может смотреть общую статистику. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
         return
 
     rows = await db.get_all_player_stats()
