@@ -16,7 +16,6 @@ class Database:
 
     async def setup(self):
         async with self.pool.acquire() as conn:
-            # Игроки
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS players (
                     id BIGINT PRIMARY KEY,
@@ -27,7 +26,6 @@ class Database:
                     citizen_wins INTEGER DEFAULT 0
                 );
             """)
-            # Игры
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS games (
                     id SERIAL PRIMARY KEY,
@@ -38,7 +36,6 @@ class Database:
                     winner_side TEXT
                 );
             """)
-            # Участники
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS game_participants (
                     game_id INTEGER REFERENCES games(id),
@@ -47,7 +44,6 @@ class Database:
                     alive BOOLEAN
                 );
             """)
-            # Картинки
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS role_images (
                     id SERIAL PRIMARY KEY,
@@ -138,3 +134,11 @@ class Database:
                 FROM players
                 WHERE id=$1;
             """, user_id)
+
+    async def get_all_player_stats(self):
+        async with self.pool.acquire() as conn:
+            return await conn.fetch("""
+                SELECT username, games_played, games_won, mafia_wins, citizen_wins
+                FROM players
+                ORDER BY games_played DESC;
+            """)
