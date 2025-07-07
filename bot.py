@@ -50,14 +50,21 @@ async def start(message: Message):
 
 @dp.callback_query(lambda c: c.data == "create_lobby")
 async def create_lobby(callback: CallbackQuery):
+    if callback.message.chat.type == "private":
+        await callback.message.answer("❌ Игру можно создавать только в группе.")
+        return
+
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
+    full_name = callback.from_user.full_name
+
     lobbies[chat_id] = {
         "host_id": user_id,
-        "players": {}
+        "players": {user_id: full_name}
     }
+
     await callback.message.answer(
-        f"🎮 Игра создана ведущим {callback.from_user.full_name}. Игроки могут присоединяться.",
+        f"🎮 Игра создана ведущим {full_name}. Игроки могут присоединяться.",
         reply_markup=get_lobby_menu(is_host=True)
     )
 
@@ -65,9 +72,11 @@ async def create_lobby(callback: CallbackQuery):
 async def join_lobby(callback: CallbackQuery, db: Database):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
+
     if chat_id not in lobbies:
         await callback.message.answer("Нет активной лобби. Сначала создайте игру.")
         return
+
     lobbies[chat_id]["players"][user_id] = callback.from_user.full_name
     await db.add_player(user_id, callback.from_user.full_name)
     await callback.message.answer(f"{callback.from_user.full_name} присоединился к игре.")
@@ -79,7 +88,9 @@ async def start_lobby(callback: CallbackQuery, db: Database):
 
     lobby = lobbies.get(chat_id)
     if not lobby or lobby["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может начать игру. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
+        host_id = lobby["host_id"] if lobby else None
+        host_name = lobby["players"].get(host_id, "неизвестен") if lobby else "неизвестен"
+        await callback.message.answer(f"❌ Только ведущий может начать игру. Ведущий: {host_name}")
         return
 
     players = list(lobby["players"].keys())
@@ -112,9 +123,11 @@ async def start_lobby(callback: CallbackQuery, db: Database):
     ongoing_games[chat_id] = {
         "game_id": game_id,
         "host_id": user_id,
+        "host_name": callback.from_user.full_name,
         "alive_players": alive,
         "votes": {}
     }
+
     lobbies.pop(chat_id)
     await callback.message.answer("🎲 Игра началась!", reply_markup=get_lobby_menu(is_host=True))
 
@@ -123,8 +136,11 @@ async def start_vote(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
     game = ongoing_games.get(chat_id)
+
     if not game or game["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может начать голосование. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
+        await callback.message.answer(
+            f"❌ Только ведущий может начать голосование. Ведущий: {game.get('host_name', 'неизвестен') if game else 'неизвестен'}"
+        )
         return
 
     markup = InlineKeyboardMarkup(
@@ -183,8 +199,11 @@ async def end_game(callback: CallbackQuery, db: Database):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
     game = ongoing_games.get(chat_id)
+
     if not game or game["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может завершить игру. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
+        await callback.message.answer(
+            f"❌ Только ведущий может завершить игру. Ведущий: {game.get('host_name', 'неизвестен') if game else 'неизвестен'}"
+        )
         return
 
     await db.finalize_game(game["game_id"], winner="Прервано")
@@ -211,8 +230,11 @@ async def all_stats(callback: CallbackQuery, db: Database):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
     game = ongoing_games.get(chat_id)
+
     if not game or game["host_id"] != user_id:
-        await callback.message.answer("❌ Только ведущий может смотреть общую статистику. Ведущий: {lobby['players'].get(host_id, 'неизвестен')}")
+        await callback.message.answer(
+            f"❌ Только ведущий может смотреть общую статистику. Ведущий: {game.get('host_name', 'неизвестен') if game else 'неизвестен'}"
+        )
         return
 
     rows = await db.get_all_player_stats()
