@@ -56,8 +56,7 @@ class Database:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("""
                 INSERT INTO games(chat_id, chat_title, start_time)
-                VALUES($1, $2, $3)
-                RETURNING id;
+                VALUES($1, $2, $3) RETURNING id;
             """, chat_id, chat_title, datetime.utcnow())
             return row["id"]
 
@@ -81,15 +80,12 @@ class Database:
             rows = await conn.fetch("""
                 SELECT image FROM role_images WHERE role=$1;
             """, role)
-            if rows:
-                return random.choice(rows)["image"]
-            return None
+            return random.choice(rows)["image"] if rows else None
 
     async def mark_dead(self, game_id, user_id):
         async with self.pool.acquire() as conn:
             await conn.execute("""
-                UPDATE game_participants
-                SET alive=FALSE
+                UPDATE game_participants SET alive=FALSE
                 WHERE game_id=$1 AND user_id=$2;
             """, game_id, user_id)
 
@@ -104,8 +100,7 @@ class Database:
     async def finalize_game(self, game_id, winner):
         async with self.pool.acquire() as conn:
             await conn.execute("""
-                UPDATE games
-                SET end_time=$1, winner_side=$2
+                UPDATE games SET end_time=$1, winner_side=$2
                 WHERE id=$3;
             """, datetime.utcnow(), winner, game_id)
 
@@ -118,12 +113,14 @@ class Database:
                 await conn.execute("""
                     UPDATE players
                     SET games_played = games_played + 1,
-                        games_won = games_won + CASE WHEN
-                            ($1='Мафия' AND role='Мафия') OR
-                            ($1='Мирные' AND role!='Мафия')
-                        THEN 1 ELSE 0 END,
-                        mafia_wins = mafia_wins + CASE WHEN ($1='Мафия' AND role='Мафия') THEN 1 ELSE 0 END,
-                        citizen_wins = citizen_wins + CASE WHEN ($1='Мирные' AND role!='Мафия') THEN 1 ELSE 0 END
+                        games_won = games_won + CASE
+                            WHEN ($1='Мафия' AND role='Мафия')
+                              OR ($1='Мирные' AND role!='Мафия')
+                            THEN 1 ELSE 0 END,
+                        mafia_wins = mafia_wins + CASE
+                            WHEN ($1='Мафия' AND role='Мафия') THEN 1 ELSE 0 END,
+                        citizen_wins = citizen_wins + CASE
+                            WHEN ($1='Мирные' AND role!='Мафия') THEN 1 ELSE 0 END
                     WHERE id=$2;
                 """, winner, p["user_id"])
 
@@ -131,14 +128,12 @@ class Database:
         async with self.pool.acquire() as conn:
             return await conn.fetchrow("""
                 SELECT games_played, games_won, mafia_wins, citizen_wins
-                FROM players
-                WHERE id=$1;
+                FROM players WHERE id=$1;
             """, user_id)
 
     async def get_all_player_stats(self):
         async with self.pool.acquire() as conn:
             return await conn.fetch("""
                 SELECT username, games_played, games_won, mafia_wins, citizen_wins
-                FROM players
-                ORDER BY games_played DESC;
+                FROM players ORDER BY games_played DESC;
             """)
