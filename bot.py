@@ -44,9 +44,10 @@ async def cmd_start(message: Message):
 
 @dp.callback_query(lambda c: c.data == "create_lobby")
 async def create_lobby(callback: CallbackQuery):
-    if callback.message.chat.type != "group":
+    if callback.message.chat.type == "private":
         await callback.message.answer("❌ Игру можно создавать только в группе.")
         return
+
 
     cid = callback.message.chat.id
     uid = callback.from_user.id
