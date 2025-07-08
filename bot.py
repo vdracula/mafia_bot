@@ -261,15 +261,28 @@ async def process_vote(callback: CallbackQuery, db: Database):
 async def end_game(callback: CallbackQuery, db: Database):
     cid = callback.message.chat.id
     uid = callback.from_user.id
-    game = ongoing_games.get(cid)
 
-    if not game or game["host_id"] != uid:
-        await callback.answer("❌ Только ведущий может завершить игру.", show_alert=True)
+    # Проверим, есть ли активная игра
+    game = ongoing_games.get(cid)
+    lobby = lobbies.get(cid)
+
+    if game:
+        if game["host_id"] != uid:
+            await callback.answer("❌ Только ведущий может завершить игру.", show_alert=True)
+            return
+        await db.finalize_game(game["game_id"], "Прервано")
+        ongoing_games.pop(cid, None)
+        await callback.message.reply("🛑 Игра завершена ведущим.")
+    elif lobby:
+        if lobby["host_id"] != uid:
+            await callback.answer("❌ Только ведущий может завершить лобби.", show_alert=True)
+            return
+        lobbies.pop(cid, None)
+        await callback.message.reply("🛑 Лобби закрыто ведущим.")
+    else:
+        await callback.answer("❌ Нет активной игры или лобби.", show_alert=True)
         return
 
-    await db.finalize_game(game["game_id"], "Прервано")
-    ongoing_games.pop(cid, None)
-    await callback.message.reply("🛑 Игра завершена ведущим.")
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "my_stats")
