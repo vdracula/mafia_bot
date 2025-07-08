@@ -81,23 +81,48 @@ async def start_lobby(callback: CallbackQuery, db: Database):
         return
 
     players = lobby["players"]
-    if len(players) < 2:
-        await callback.message.answer("Недостаточно игроков.")
+    if len(players) < 4:
+        await callback.message.answer("Нужно минимум 4 игрока.")
         return
 
     gid = await db.create_game(cid, callback.message.chat.title)
-    mafia_ids = random.sample(list(players), 2 if len(players) >= 5 else 1)
+
+    player_ids = list(players)
+    random.shuffle(player_ids)
+
+    # Выбираем мафию
+    mafia_count = 2 if len(players) >= 6 else 1
+    mafia_ids = set(player_ids[:mafia_count])
+
+    # Из оставшихся выбираем комиссара и доктора
+    remaining = [pid for pid in player_ids if pid not in mafia_ids]
+    commissioner_id = remaining[0] if len(remaining) >= 1 else None
+    doctor_id = remaining[1] if len(remaining) >= 2 else None
 
     alive = {}
-    for pid, pname in players.items():
-        role = "Мафия" if pid in mafia_ids else "Мирные"
+
+    for pid in player_ids:
+        if pid in mafia_ids:
+            role = "Мафия"
+        elif pid == commissioner_id:
+            role = "Комиссар"
+        elif pid == doctor_id:
+            role = "Доктор"
+        else:
+            role = "Мирный"
+
         await db.add_participant(gid, pid, role)
+
         image = await db.get_role_image(role)
         if image:
-            await bot.send_photo(pid, BufferedInputFile(image, filename="role.jpg"),
-                                 caption=f"Ваша роль: {role}")
+            await bot.send_photo(
+                pid,
+                BufferedInputFile(image, filename="role.jpg"),
+                caption=f"🕵 Ваша роль: <b>{role}</b>"
+            )
         else:
-            await bot.send_message(pid, f"Ваша роль: {role}")
+            await bot.send_message(pid, f"🕵 Ваша роль: <b>{role}</b>")
+
         alive[pid] = role
 
     ongoing_games[cid] = {
@@ -106,8 +131,10 @@ async def start_lobby(callback: CallbackQuery, db: Database):
         "host_name": callback.from_user.full_name,
         "alive_players": alive,
         "player_names": players,
-        "votes": {}
+        "votes": {},
+        "voters": set(alive.keys())  # Все могут голосовать по умолчанию
     }
+
     lobbies.pop(cid, None)
     await callback.message.answer("🎲 Игра началась!", reply_markup=get_lobby_menu(is_host=True))
 
@@ -121,12 +148,64 @@ async def start_vote(callback: CallbackQuery):
         await callback.message.answer("❌ Только ведущий может начать голосование.")
         return
 
+    # Ведущий выбирает, кто будет голосовать (выбор среди живых игроков)
+    keyboard = []
+    for pid in game["alive_players"]:
+        name = game["player_names"].get(pid, str(pid))
+        selected = "✅" if pid in game["voters"] else ""
+        keyboard.append([InlineKeyboardButton(text=f"{name} {selected}", callback_data=f"toggle_voter_{pid}")])
+
+    keyboard.append([InlineKeyboardButton(text="▶️ Начать голосование", callback_data="begin_vote")])
+
+    await callback.message.answer("🗳 Выберите участников, которые могут голосовать:", 
+                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
+@dp.callback_query(lambda c: c.data.startswith("toggle_voter_"))
+async def toggle_voter(callback: CallbackQuery):
+    cid = callback.message.chat.id
+    uid = callback.from_user.id
+    game = ongoing_games.get(cid)
+
+    if not game or game["host_id"] != uid:
+        await callback.answer("❌ Только ведущий может изменять список голосующих.", show_alert=True)
+        return
+
+    target = int(callback.data.split("_")[-1])
+    if target in game["voters"]:
+        game["voters"].remove(target)
+    else:
+        game["voters"].add(target)
+
+    # Обновляем меню выбора
+    keyboard = []
+    for pid in game["alive_players"]:
+        name = game["player_names"].get(pid, str(pid))
+        selected = "✅" if pid in game["voters"] else ""
+        keyboard.append([InlineKeyboardButton(text=f"{name} {selected}", callback_data=f"toggle_voter_{pid}")])
+
+    keyboard.append([InlineKeyboardButton(text="▶️ Начать голосование", callback_data="begin_vote")])
+
+    await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "begin_vote")
+async def begin_vote(callback: CallbackQuery):
+    cid = callback.message.chat.id
+    game = ongoing_games.get(cid)
+
+    if not game:
+        await callback.message.answer("Нет активной игры.")
+        return
+
     keyboard = []
     for pid in game["alive_players"]:
         name = game["player_names"].get(pid, str(pid))
         keyboard.append([InlineKeyboardButton(text=name, callback_data=f"vote_{pid}")])
 
-    await callback.message.answer("🗳 Голосование! Выберите:", 
+    # Очищаем предыдущие голоса перед новым голосованием
+    game["votes"].clear()
+
+    await callback.message.answer("🗳 Голосование! Выберите, кого вы хотите исключить:", 
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
 @dp.callback_query(lambda c: c.data.startswith("vote_"))
@@ -141,13 +220,17 @@ async def process_vote(callback: CallbackQuery, db: Database):
     target = int(callback.data.split("_")[1])
 
     if voter not in game["alive_players"]:
-        await callback.answer("Вы не участвуете.")
+        await callback.answer("Вы не участвуете в игре.", show_alert=True)
+        return
+
+    if voter not in game["voters"]:
+        await callback.answer("Вы не участвуете в голосовании.", show_alert=True)
         return
 
     game["votes"][voter] = target
     await callback.answer("Голос учтён ✅")
 
-    if len(game["votes"]) == len(game["alive_players"]):
+    if len(game["votes"]) == len(game["voters"]):
         tally = {}
         for t in game["votes"].values():
             tally[t] = tally.get(t, 0) + 1
@@ -172,7 +255,7 @@ async def process_vote(callback: CallbackQuery, db: Database):
             ongoing_games.pop(cid, None)
         else:
             game["votes"].clear()
-            await bot.send_message(cid, "🗳 Новый раунд!")
+            await bot.send_message(cid, "🗳 Новый раунд голосования!")
 
 @dp.callback_query(lambda c: c.data == "end_game")
 async def end_game(callback: CallbackQuery, db: Database):
@@ -184,44 +267,9 @@ async def end_game(callback: CallbackQuery, db: Database):
         await callback.answer("❌ Только ведущий может завершить игру.", show_alert=True)
         return
 
-    await db.finalize_game(game["game_id"], "Прервано")
+    await db.finalize_game(game["game_id"], "Принудительное завершение")
     ongoing_games.pop(cid, None)
-    await callback.message.reply("🛑 Игра завершена ведущим.")
-    await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "my_stats")
-async def my_stats(callback: CallbackQuery, db: Database):
-    stats = await db.get_player_stats(callback.from_user.id)
-    if stats:
-        await callback.message.answer(
-            f"👤 Ваша статистика:\n"
-            f"Игры: {stats['games_played']}\n"
-            f"Победы: {stats['games_won']}\n"
-            f"Мафия: {stats['mafia_wins']}\n"
-            f"Мирные: {stats['citizen_wins']}"
-        )
-    else:
-        await callback.message.answer("Нет статистики.")
-
-@dp.callback_query(lambda c: c.data == "all_stats")
-async def all_stats(callback: CallbackQuery, db: Database):
-    cid = callback.message.chat.id
-    uid = callback.from_user.id
-    game = ongoing_games.get(cid)
-
-    rows = await db.get_all_player_stats()
-    if not rows:
-        await callback.message.answer("Нет статистики.")
-        return
-
-    text = "📊 Общая статистика:\n"
-    for r in rows:
-        text += (
-            f"{r['username']}: "
-            f"Игры={r['games_played']} Победы={r['games_won']} "
-            f"Мафия={r['mafia_wins']} Мирные={r['citizen_wins']}\n"
-        )
-    await callback.message.answer(text)
+    await callback.message.answer("🛑 Игра завершена ведущим.")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
