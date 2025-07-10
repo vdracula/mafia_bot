@@ -11,12 +11,19 @@ from aiogram.types import (
 from aiogram.exceptions import TelegramMigrateToChat
 from db import Database
 from middlewares import DBMiddleware
+from dotenv import load_dotenv
 
+# Загрузка переменных окружения из .env
+load_dotenv()
+
+# Получение токена и строки подключения к БД
 TOKEN = os.getenv("BOT_TOKEN")
 DB_URL = os.getenv("DATABASE_URL")
 
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher()
+# Проверка
+if not TOKEN or not DB_URL:
+    raise ValueError("❌ BOT_TOKEN и/или DATABASE_URL не заданы в .env")
+
 
 lobbies = {}
 ongoing_games = {}
